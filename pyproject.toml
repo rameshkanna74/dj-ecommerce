@@ -1,11 +1,15 @@
 [project]
 name = "corecart"
 version = "1.0.0"
-description = "CoreCart 1.0 - a server-rendered multi-vendor e-commerce marketplace built with Django."
+description = "CoreCart 1.0 - multi-vendor e-commerce marketplace: Django REST Framework API (plus server-rendered pages)."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "django>=6.0",
+    "django-cors-headers>=4.9.0",
+    "djangorestframework>=3.18.3",
+    "djangorestframework-simplejwt>=5.5.1",
+    "drf-spectacular>=0.30.0",
     "pillow>=12.0.0",
 ]
 
@@ -13,6 +17,13 @@ dependencies = [
 # Install with `uv sync --extra postgres` when DB_ENGINE=postgresql.
 postgres = [
     "psycopg[binary]>=3.2",
+]
+# Everything a production deployment needs: `uv sync --extra production`.
+production = [
+    "django-storages[s3]>=1.14.6",
+    "gunicorn>=27.0.1",
+    "psycopg[binary]>=3.3.9",
+    "redis>=8.1.0",
 ]
 
 [dependency-groups]

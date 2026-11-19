@@ -10,7 +10,8 @@ admin.site.site_title = "CoreCart admin"
 admin.site.index_title = "Marketplace management"
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
+    path("api/v1/", include("config.api_urls")),
     path("cart/", include("cart.urls")),
     path("", include("core.urls")),
     path("", include("accounts.urls")),

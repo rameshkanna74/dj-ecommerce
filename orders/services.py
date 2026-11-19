@@ -142,7 +142,7 @@ def place_order(user, *, shipping, payment_method, coupon_code="", checkout_toke
                 if available
                 else f'"{product.name}" is out of stock. Please remove it from your cart.'
             )
-        unit_price = variant.current_price if variant else product.price
+        unit_price = variant.price_override if variant and variant.price_override is not None else product.price
         subtotal += unit_price * item.quantity
         lines.append((item, product, variant, unit_price))
     subtotal = money(subtotal)

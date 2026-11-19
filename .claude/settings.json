@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(.venv\\Scripts\\python.exe -m pytest *)",
+      "PowerShell(.venv\\Scripts\\python.exe manage.py check *)",
+      "PowerShell(.venv\\Scripts\\python.exe manage.py makemigrations --check --dry-run *)",
+      "PowerShell(.venv\\Scripts\\python.exe manage.py showmigrations *)",
+      "PowerShell(.venv\\Scripts\\python.exe manage.py spectacular --validate *)",
+      "PowerShell(uv sync *)",
+      "PowerShell(git status *)",
+      "PowerShell(git diff *)",
+      "PowerShell(git log *)"
+    ]
+  }
+}

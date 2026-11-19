@@ -227,7 +227,7 @@ class ProductVariant(models.Model):
         return f"{self.product.name} - {self.label}"
 
     @property
-    def label(self):
+    def label(self) -> str:
         return f"{self.attribute_name}: {self.attribute_value}"
 
     @property

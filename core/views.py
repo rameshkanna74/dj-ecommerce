@@ -1,4 +1,5 @@
 from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.shortcuts import render
 
 from products.models import Category, Product
@@ -44,13 +45,24 @@ def about(request):
     return render(request, "core/about.html")
 
 
+def _is_api(request):
+    return request.path.startswith("/api/")
+
+
 def error_403(request, exception=None):
+    if _is_api(request):
+        return JsonResponse({"detail": "You do not have permission to perform this action.",
+                             "code": "permission_denied"}, status=403)
     return render(request, "errors/403.html", status=403)
 
 
 def error_404(request, exception=None):
+    if _is_api(request):
+        return JsonResponse({"detail": "Not found.", "code": "not_found"}, status=404)
     return render(request, "errors/404.html", status=404)
 
 
 def error_500(request):
+    if _is_api(request):
+        return JsonResponse({"detail": "A server error occurred.", "code": "server_error"}, status=500)
     return render(request, "errors/500.html", status=500)

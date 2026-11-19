@@ -7,6 +7,7 @@ real environment variables always take precedence over it.
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -26,7 +27,8 @@ def _load_dotenv(path):
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-_load_dotenv(BASE_DIR / ".env")
+if not os.environ.get("DJANGO_SKIP_DOTENV"):
+    _load_dotenv(BASE_DIR / ".env")
 
 
 def env(name, default=None):
@@ -61,6 +63,10 @@ ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1" if DEBUG 
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 BASE_URL = env("CORECART_BASE_URL", "http://localhost:8000").rstrip("/")
+CORECART_VERSION = "1.0.0"
+
+# URL prefix of the Django admin (change it in production to reduce automated probing).
+ADMIN_URL = env("DJANGO_ADMIN_URL", "admin/").strip("/") + "/"
 
 AUTH_USER_MODEL = "accounts.CustomUser"
 
@@ -73,6 +79,10 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
     "django.forms",
+    "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "drf_spectacular",
+    "corsheaders",
     "core",
     "accounts",
     "products",
@@ -84,8 +94,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.http.ConditionalGetMiddleware",  # ETag / 304 Not Modified
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -199,8 +211,39 @@ STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = Path(env("DJANGO_STATIC_ROOT", str(BASE_DIR / "staticfiles")))
 
-MEDIA_URL = "/media/"
+MEDIA_URL = env("DJANGO_MEDIA_URL", "/media/")
 MEDIA_ROOT = Path(env("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media")))
+
+# Uploaded media: local disk (default) or any S3-compatible bucket (AWS S3, Cloudflare R2,
+# MinIO, ...). S3 credentials come from the standard AWS_ACCESS_KEY_ID /
+# AWS_SECRET_ACCESS_KEY environment variables. Requires the `production` extra.
+MEDIA_STORAGE = env("MEDIA_STORAGE", "local").lower()
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        # Hashed filenames in production so static assets can be cached forever.
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        if DEBUG
+        else "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+    },
+}
+if MEDIA_STORAGE == "s3":
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": env("S3_BUCKET_NAME", ""),
+            "region_name": env("S3_REGION", "") or None,
+            "endpoint_url": env("S3_ENDPOINT_URL", "") or None,
+            "custom_domain": env("S3_CUSTOM_DOMAIN", "") or None,  # e.g. a CDN in front of the bucket
+            "location": env("S3_MEDIA_PREFIX", "media"),
+            "file_overwrite": False,
+            "querystring_auth": env_bool("S3_SIGNED_URLS", False),
+        },
+    }
+    if not STORAGES["default"]["OPTIONS"]["bucket_name"]:
+        raise ImproperlyConfigured("S3_BUCKET_NAME is required when MEDIA_STORAGE=s3.")
+elif MEDIA_STORAGE != "local":
+    raise ImproperlyConfigured("MEDIA_STORAGE must be 'local' or 's3'.")
 
 # Upload limits (bytes)
 CORECART_MAX_IMAGE_SIZE = int(env("CORECART_MAX_IMAGE_SIZE", str(2 * 1024 * 1024)))
@@ -211,12 +254,25 @@ FILE_UPLOAD_PERMISSIONS = 0o644
 # --------------------------------------------------------------------------
 # Cache
 # --------------------------------------------------------------------------
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "corecart",
+# Use Redis in production: API rate limits and cached navigation data must be shared
+# by every worker process. Requires the `production` extra.
+REDIS_URL = env("REDIS_URL", "")
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "KEY_PREFIX": env("CACHE_KEY_PREFIX", "corecart"),
+            "TIMEOUT": 300,
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "corecart",
+        }
+    }
 
 # --------------------------------------------------------------------------
 # Email
@@ -246,6 +302,93 @@ SERVER_EMAIL = env("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 CORECART_PAYMENT_METHODS = env_list("CORECART_PAYMENT_METHODS", "cod,bank_transfer")
 CORECART_CURRENCY_SYMBOL = env("CORECART_CURRENCY_SYMBOL", "$")
 CORECART_RECENTLY_VIEWED_LIMIT = 8
+
+# Public URL of a separate frontend, if any. Used for links in API-triggered emails
+# (e.g. password reset). Empty means links point at this Django site.
+CORECART_FRONTEND_URL = env("CORECART_FRONTEND_URL", "").rstrip("/")
+
+# --------------------------------------------------------------------------
+# REST API
+# --------------------------------------------------------------------------
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",  # enforces CSRF
+    ],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_PAGINATION_CLASS": "core.api.pagination.StandardPagination",
+    "PAGE_SIZE": 20,
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.MultiPartParser",
+        "rest_framework.parsers.FormParser",
+    ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("API_THROTTLE_ANON", "120/min"),
+        "user": env("API_THROTTLE_USER", "1200/min"),
+        "auth": env("API_THROTTLE_AUTH", "20/min"),
+    },
+    "EXCEPTION_HANDLER": "core.api.exceptions.api_exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "TEST_REQUEST_DEFAULT_FORMAT": "json",
+}
+if DEBUG:
+    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"].append("rest_framework.renderers.BrowsableAPIRenderer")
+
+# --------------------------------------------------------------------------
+# Browser frontend on another origin (e.g. a React SPA)
+# --------------------------------------------------------------------------
+CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000" if DEBUG else "")
+CORS_ALLOW_CREDENTIALS = True  # needed for the httpOnly refresh cookie / session cookie
+CORS_URLS_REGEX = r"^/api/.*$"
+CORS_ALLOW_HEADERS = (
+    "accept", "authorization", "content-type", "origin", "user-agent", "x-csrftoken", "x-requested-with",
+    "idempotency-key",
+)
+CORS_PREFLIGHT_MAX_AGE = 86400
+# The SPA's origin must be trusted for CSRF-protected (session/cookie) requests.
+CSRF_TRUSTED_ORIGINS = sorted(set(CSRF_TRUSTED_ORIGINS) | set(CORS_ALLOWED_ORIGINS))
+
+# Refresh-token cookie for browser clients. When a login request is made with
+# `"use_cookie": true`, the refresh token is set as an httpOnly cookie (never
+# readable by JavaScript) and omitted from the JSON body.
+JWT_REFRESH_COOKIE_NAME = env("JWT_REFRESH_COOKIE_NAME", "cc_refresh")
+JWT_REFRESH_COOKIE_PATH = "/api/v1/auth/"
+JWT_REFRESH_COOKIE_SECURE = env_bool("JWT_REFRESH_COOKIE_SECURE", not DEBUG)
+# "Lax" works when the SPA and API share a site (app.example.com + api.example.com).
+# Use "None" (with Secure) only if they are on entirely different sites.
+JWT_REFRESH_COOKIE_SAMESITE = env("JWT_REFRESH_COOKIE_SAMESITE", "Lax")
+JWT_REFRESH_COOKIE_DOMAIN = env("JWT_REFRESH_COOKIE_DOMAIN", "") or None
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(env("JWT_ACCESS_MINUTES", "15"))),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(env("JWT_REFRESH_DAYS", "7"))),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "CoreCart API",
+    "DESCRIPTION": "REST API for the CoreCart multi-vendor marketplace. Authenticate with a JWT "
+    "(`Authorization: Bearer <access>`) obtained from `/api/v1/auth/token/`, or with a session cookie + CSRF token.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "ENUM_NAME_OVERRIDES": {
+        "OrderStatusEnum": "orders.models.Order.Status",
+        "TicketStatusEnum": "support.models.SupportTicket.Status",
+        "ApprovalStatusEnum": "accounts.models.VendorProfile.Approval",
+    },
+}
 
 LOGGING = {
     "version": 1,

@@ -11,7 +11,7 @@ from core.mixins import SafePaginationMixin
 
 from .forms import ProductFilterForm, QuestionForm, ReviewForm
 from .models import Category, Product, ProductQuestion, Review
-from .services import subscribe_stock_alert, user_has_purchased
+from .services import filter_catalogue, subscribe_stock_alert, user_has_purchased
 
 SESSION_RECENT_KEY = "recently_viewed"
 
@@ -44,30 +44,8 @@ class ProductListView(SafePaginationMixin, ListView):
     def get_queryset(self):
         form = self.get_filter_form()
         data = form.cleaned_data if form.is_bound else {}
-        queryset = Product.objects.visible().for_listing().prefetch_related("variants")
-
-        queryset = queryset.search(data.get("q"))
-        if data.get("category"):
-            queryset = queryset.filter(category__slug=data["category"])
-        if data.get("min_price") is not None and "min_price" not in form.errors:
-            queryset = queryset.filter(price__gte=data["min_price"])
-        if data.get("max_price") is not None and "max_price" not in form.errors:
-            queryset = queryset.filter(price__lte=data["max_price"])
-        if data.get("in_stock"):
-            queryset = queryset.in_stock()
-
-        sort = data.get("sort") or "newest"
-        if sort == "price_asc":
-            queryset = queryset.order_by("price", "-created_at")
-        elif sort == "price_desc":
-            queryset = queryset.order_by("-price", "-created_at")
-        elif sort == "popular":
-            queryset = queryset.with_units_sold().order_by("-units_sold", "-created_at")
-        elif sort == "rating":
-            queryset = queryset.order_by("-average_rating", "-review_count", "-created_at")
-        else:
-            queryset = queryset.order_by("-created_at")
-        return queryset
+        # Invalid fields are absent from cleaned_data, so they are simply ignored here.
+        return filter_catalogue(Product.objects.visible().for_listing().prefetch_related("variants"), data)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

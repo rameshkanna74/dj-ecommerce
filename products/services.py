@@ -7,6 +7,34 @@ from core.emails import absolute_url, send_templated_email
 from .models import Product, StockAlert
 
 
+SORT_ORDERINGS = {
+    "price_asc": ("price", "-created_at"),
+    "price_desc": ("-price", "-created_at"),
+    "rating": ("-average_rating", "-review_count", "-created_at"),
+    "newest": ("-created_at",),
+}
+
+
+def filter_catalogue(queryset, data):
+    """
+    Apply validated ``ProductFilterForm`` data (q, category, min_price, max_price,
+    in_stock, sort) to a product queryset. Shared by the HTML catalogue and the API.
+    """
+    queryset = queryset.search(data.get("q"))
+    if data.get("category"):
+        queryset = queryset.filter(category__slug=data["category"])
+    if data.get("min_price") is not None:
+        queryset = queryset.filter(price__gte=data["min_price"])
+    if data.get("max_price") is not None:
+        queryset = queryset.filter(price__lte=data["max_price"])
+    if data.get("in_stock"):
+        queryset = queryset.in_stock()
+    sort = data.get("sort") or "newest"
+    if sort == "popular":
+        return queryset.with_units_sold().order_by("-units_sold", "-created_at")
+    return queryset.order_by(*SORT_ORDERINGS.get(sort, SORT_ORDERINGS["newest"]))
+
+
 def notify_back_in_stock(product_id):
     """
     Email every subscriber who has not been notified yet, once the product is

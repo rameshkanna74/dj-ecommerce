@@ -161,6 +161,20 @@ def fill_cart():
     return _fill
 
 
+@pytest.fixture
+def api():
+    """Factory for DRF APIClients, optionally authenticated as ``user``."""
+    from rest_framework.test import APIClient
+
+    def _client(user=None):
+        client = APIClient()
+        if user is not None:
+            client.force_authenticate(user)
+        return client
+
+    return _client
+
+
 SHIPPING = {
     "full_name": "Alice Smith",
     "phone": "+1 555 0100",

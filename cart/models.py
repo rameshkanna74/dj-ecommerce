@@ -39,7 +39,10 @@ class CartItem(models.Model):
 
     @property
     def unit_price(self):
-        return self.variant.current_price if self.variant_id else self.product.price
+        # Avoid variant.current_price here: it would re-fetch variant.product per line.
+        if self.variant_id and self.variant.price_override is not None:
+            return self.variant.price_override
+        return self.product.price
 
     @property
     def subtotal(self):

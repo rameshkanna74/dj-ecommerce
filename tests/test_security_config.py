@@ -12,11 +12,12 @@ SETTINGS_FILE = Path(__file__).resolve().parent.parent / "config" / "settings.py
 def load_settings(monkeypatch, **env):
     """Evaluate config/settings.py in isolation with the given environment (ignoring .env)."""
     for key in ["DJANGO_DEBUG", "DJANGO_SECRET_KEY", "DJANGO_ALLOWED_HOSTS", "DJANGO_SECURE_SSL_REDIRECT",
-                "DB_ENGINE", "DJANGO_SECURE_COOKIES"]:
+                "DB_ENGINE", "DJANGO_SECURE_COOKIES", "REDIS_URL", "MEDIA_STORAGE", "CORS_ALLOWED_ORIGINS"]:
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("DJANGO_SKIP_DOTENV", "1")
     for key, value in env.items():
         monkeypatch.setenv(key, value)
-    source = SETTINGS_FILE.read_text(encoding="utf-8").replace('_load_dotenv(BASE_DIR / ".env")', "")
+    source = SETTINGS_FILE.read_text(encoding="utf-8")
     namespace = {"__file__": str(SETTINGS_FILE)}
     exec(compile(source, str(SETTINGS_FILE), "exec"), namespace)
     return namespace

@@ -6,7 +6,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from orders import services
-from products.models import ProductVariant, Review
+from products.models import Product, ProductVariant, Review
 
 from .conftest import make_user
 
@@ -34,6 +34,34 @@ def test_catalogue_pages_constant_queries(client, make_product, url_name):
     small = count_queries(client, reverse(url_name))
     seed_products(make_product, 2, 8)
     assert count_queries(client, reverse(url_name)) == small
+
+
+def api_query_count(client, url):
+    client.get(url)
+    with CaptureQueriesContext(connection) as ctx:
+        assert client.get(url).status_code == 200
+    return len(ctx.captured_queries)
+
+
+def test_api_lists_constant_queries(api, customer, vendor, make_product, fill_cart, shipping):
+    seed_products(make_product, 0, 2)
+    for product in list(Product.objects.all()):
+        fill_cart(customer, product, variant=product.variants.first())
+    services.place_order(customer, shipping=shipping, payment_method="cod", checkout_token="a1")
+    for product in Product.objects.all()[:2]:
+        fill_cart(customer, product, variant=product.variants.first())
+    urls = [reverse("api:product-list"), reverse("api:vendor-product-list"), reverse("api:vendor-order-items"),
+            reverse("api:orders"), reverse("api:cart")]
+    clients = [api(), api(vendor.user), api(vendor.user), api(customer), api(customer)]
+    before = [api_query_count(c, u) for c, u in zip(clients, urls)]
+
+    seed_products(make_product, 2, 8)
+    for product in Product.objects.exclude(order_items__isnull=False).exclude(cart_items__isnull=False):
+        fill_cart(customer, product, variant=product.variants.first())
+    services.place_order(customer, shipping=shipping, payment_method="cod", checkout_token="a2")
+    for product in Product.objects.all()[:6]:
+        fill_cart(customer, product, variant=product.variants.first())
+    assert [api_query_count(c, u) for c, u in zip(clients, urls)] == before
 
 
 def test_cart_and_vendor_lists_constant_queries(login, customer, vendor, make_product, fill_cart, shipping):

@@ -29,8 +29,10 @@ class CartSummary:
 
 
 def cart_queryset(user):
-    return CartItem.objects.filter(user=user).select_related(
-        "product__category", "product__vendor__user", "variant"
+    return (
+        CartItem.objects.filter(user=user)
+        .select_related("product__category", "product__vendor__user", "variant")
+        .prefetch_related("product__variants")
     )
 
 
