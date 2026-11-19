@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Order {{ order.order_number }}{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/vendor_nav.html" %}
+  <div class="stack-lg">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="{% url 'orders:vendor_order_list' %}">Orders</a></li><li aria-current="page">{{ order.order_number }}</li></ol></nav>
+    <div class="page-head">
+      <div><h1>Order <span class="mono">{{ order.order_number }}</span></h1><p>Placed {{ order.created_at|date:"F j, Y, g:i a" }}</p></div>
+      <div class="cluster">
+        <span class="badge badge--{{ order.status|status_tone }}">Order {{ order.get_status_display|lower }}</span>
+        <span class="badge badge--{{ order.payment_status|status_tone }}">{{ order.get_payment_status_display }} · {{ order.get_payment_method_display }}</span>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <section class="card">
+        <h2 class="text-sm eyebrow">Ship to</h2>
+        <address><strong>{{ order.shipping_full_name }}</strong><br>{% for line in order.shipping_lines %}{{ line }}<br>{% endfor %}{{ order.shipping_phone }}</address>
+        {% if order.customer_note %}<p class="text-sm">Customer note: {{ order.customer_note }}</p>{% endif %}
+      </section>
+      <section class="card">
+        <h2 class="text-sm eyebrow">Your share of this order</h2>
+        <p class="price price--lg mb-0">{{ vendor_subtotal|money }}</p>
+        <p class="text-sm text-muted">Excludes cancelled items. Commission is deducted from paid orders.</p>
+      </section>
+    </div>
+
+    <section class="stack">
+      <h2>Your items</h2>
+      {% for item, form in item_forms %}
+        <article class="card">
+          <div class="split">
+            <div><strong>{{ item.display_name }}</strong>{% if item.variant_label %} <span class="text-muted">· {{ item.variant_label }}</span>{% endif %}<br>
+              <span class="text-sm text-muted">{{ item.quantity }} × {{ item.price|money }} = {{ item.subtotal|money }}</span></div>
+            <span class="badge badge--{{ item.status|status_tone }}">{{ item.get_status_display }}</span>
+          </div>
+          {% if item.tracking_number %}<p class="text-sm mt-0">Tracking: <span class="mono">{{ item.tracking_number }}</span></p>{% endif %}
+          {% if item.allowed_next_statuses %}
+          <form method="post" action="{% url 'orders:vendor_update_item' item.pk %}" class="form-grid" novalidate data-submit-once>
+            {% csrf_token %}
+            {{ form.status.as_field_group }}
+            {{ form.tracking_number.as_field_group }}
+            <div class="span-2"><button class="btn btn-primary btn-sm" type="submit">Update item</button>
+              <span class="text-sm text-muted">A tracking number is required when marking an item as shipped.</span></div>
+          </form>
+          {% else %}
+            <p class="text-sm text-muted mb-0">No further updates for this item.</p>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </section>
+
+    <section class="card">
+      <h2 class="text-sm eyebrow">Order timeline</h2>
+      <ol class="timeline">
+        {% for event in timeline %}<li><time datetime="{{ event.timestamp|date:'c' }}">{{ event.timestamp|date:"M j, Y g:i a" }}</time><p>{{ event.note|default:event.get_status_display }}</p></li>{% endfor %}
+      </ol>
+    </section>
+  </div>
+</div>
+{% endblock %}

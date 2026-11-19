@@ -1,0 +1,17 @@
+{% autoescape off %}{% load core_tags %}Order {{ order.order_number }} confirmed
+Hi {{ order.customer_name }},
+
+Thank you for your order. Here is a summary:
+
+{% for item in order.items.all %}- {{ item.quantity }} x {{ item.display_name }}{% if item.variant_label %} ({{ item.variant_label }}){% endif %}: {{ item.subtotal|money }}
+{% endfor %}
+Subtotal: {{ order.subtotal_amount|money }}{% if order.discount_amount %}
+Discount: -{{ order.discount_amount|money }}{% endif %}
+Total: {{ order.total_amount|money }}
+
+Payment method: {{ order.get_payment_method_display }}. Your order will be marked as paid once payment is received.
+
+Track your order: {{ url }}
+
+The {{ site_name }} team
+{% endautoescape %}

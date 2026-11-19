@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block content %}
+<div class="auth-shell auth-shell--wide">
+  <article class="card prose">
+    <span class="eyebrow">About us</span>
+    <h1>About CoreCart</h1>
+    <p>CoreCart is a multi-vendor marketplace. Independent businesses apply to sell, our team reviews each application, and approved sellers list their products for customers to discover.</p>
+    <h2>How payment works</h2>
+    <p>CoreCart currently supports cash on delivery and bank transfer. Orders are confirmed immediately, but are only marked as paid once payment has actually been received and recorded by our team.</p>
+    <h2>Need help?</h2>
+    <p>Signed-in customers can open a support ticket from their account. Our team responds to every ticket.</p>
+    <div class="cluster">
+      <a class="btn btn-primary" href="{% url 'products:list' %}">Browse products</a>
+      <a class="btn" href="{% url 'support:ticket_create' %}">Contact support</a>
+    </div>
+  </article>
+</div>
+{% endblock %}

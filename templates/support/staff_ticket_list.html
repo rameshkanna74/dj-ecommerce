@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Support queue{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/staff_nav.html" %}
+  <div>
+    <div class="page-head"><div><h1>Support queue</h1><p>All customer and vendor tickets.</p></div></div>
+    <div class="toolbar">
+      <div class="chips">
+        <a class="chip {% if not status_filter %}is-active{% endif %}" href="{% url 'support:staff_ticket_list' %}">All</a>
+        {% for value, label, count in status_counts %}<a class="chip {% if status_filter == value %}is-active{% endif %}" href="?status={{ value }}">{{ label }} ({{ count }})</a>{% endfor %}
+      </div>
+      <form method="get" class="cluster">
+        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        <label class="visually-hidden" for="q">Search tickets</label>
+        <input id="q" type="search" name="q" value="{{ query }}" placeholder="Subject, username or email">
+        <button class="btn btn-sm" type="submit">Search</button>
+      </form>
+    </div>
+    {% if tickets %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th scope="col">#</th><th scope="col">Subject</th><th scope="col">Customer</th><th scope="col">Order</th><th scope="col">Status</th><th scope="col">Updated</th></tr></thead>
+        <tbody>
+        {% for ticket in tickets %}
+          <tr>
+            <td>{{ ticket.pk }}</td>
+            <td><a href="{% url 'support:staff_ticket_detail' ticket.pk %}">{{ ticket.subject }}</a></td>
+            <td>{{ ticket.user.display_name }}<br><small class="text-muted">{{ ticket.user.get_role_display }}</small></td>
+            <td>{% if ticket.order %}<span class="mono">{{ ticket.order.order_number }}</span>{% else %}&mdash;{% endif %}</td>
+            <td><span class="badge badge--{{ ticket.status|status_tone }}">{{ ticket.get_status_display }}</span></td>
+            <td class="nowrap">{{ ticket.updated_at|date:"M j, g:i a" }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/pagination.html" %}
+    {% else %}
+      {% include "includes/empty_state.html" with icon="chat" title="No tickets" text="Nothing matches this view." %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

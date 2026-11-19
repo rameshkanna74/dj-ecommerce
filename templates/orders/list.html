@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}My orders{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/account_nav.html" %}
+  <div>
+    <div class="page-head"><div><h1>Orders</h1><p>Track deliveries, download invoices and get help.</p></div></div>
+    <div class="chips mb-4">
+      <a class="chip {% if not status_filter %}is-active{% endif %}" href="{% url 'orders:list' %}">All</a>
+      {% for value, label in status_choices %}<a class="chip {% if status_filter == value %}is-active{% endif %}" href="?status={{ value }}">{{ label }}</a>{% endfor %}
+    </div>
+    {% if orders %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th scope="col">Order</th><th scope="col">Placed</th><th scope="col">Items</th><th scope="col">Status</th><th scope="col">Payment</th><th scope="col" class="num">Total</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+          <tbody>
+          {% for order in orders %}
+            <tr>
+              <td><a class="mono" href="{{ order.get_absolute_url }}">{{ order.order_number }}</a></td>
+              <td class="nowrap">{{ order.created_at|date:"M j, Y" }}</td>
+              <td>{{ order.item_count }}</td>
+              <td><span class="badge badge--{{ order.status|status_tone }}">{{ order.get_status_display }}</span></td>
+              <td><span class="badge badge--{{ order.payment_status|status_tone }}">{{ order.get_payment_status_display }}</span></td>
+              <td class="num">{{ order.total_amount|money }}</td>
+              <td class="nowrap"><a href="{{ order.get_absolute_url }}">Details</a> · <a href="{% url 'orders:invoice' order.order_number %}">Invoice</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "includes/pagination.html" %}
+    {% else %}
+      {% url 'products:list' as shop_url %}
+      {% include "includes/empty_state.html" with icon="orders" title="No orders found" text="Orders you place will appear here." action_url=shop_url action_label="Start shopping" %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

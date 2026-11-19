@@ -1,0 +1,5 @@
+<form class="search-form" action="{% url 'products:list' %}" method="get">
+  <label class="visually-hidden" for="{{ field_id }}">Search products</label>
+  <input id="{{ field_id }}" type="search" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Search products, brands and categories" autocomplete="off" maxlength="100">
+  <button class="btn btn-primary" type="submit">{% include "includes/icon.html" with name="search" %}<span class="visually-hidden">Search</span></button>
+</form>

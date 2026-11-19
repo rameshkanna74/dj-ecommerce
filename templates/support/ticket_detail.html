@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Ticket #{{ ticket.pk }}{% endblock %}
+{% block content %}
+<div class="{% if user.is_customer or user.approved_vendor_profile %}dash{% endif %}">
+  {% include "support/_side_nav.html" %}
+  <div class="stack-lg">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="{% url 'support:ticket_list' %}">Support</a></li><li aria-current="page">Ticket #{{ ticket.pk }}</li></ol></nav>
+    <div class="page-head">
+      <div><h1>{{ ticket.subject }}</h1><p>Ticket #{{ ticket.pk }}{% if ticket.order %} · Order <span class="mono">{{ ticket.order.order_number }}</span>{% endif %}</p></div>
+      <span class="badge badge--{{ ticket.status|status_tone }}">{{ ticket.get_status_display }}</span>
+    </div>
+    {% include "support/_thread.html" %}
+    {% if ticket.is_closed %}
+      <div class="alert"><p>This ticket is closed. <a href="{% url 'support:ticket_create' %}">Open a new ticket</a> if you need more help.</p></div>
+    {% else %}
+      <form class="card" method="post" novalidate data-submit-once>
+        {% csrf_token %}
+        {{ form.body.as_field_group }}
+        <button class="btn btn-primary" type="submit">Send reply</button>
+      </form>
+      <form method="post" action="{% url 'support:ticket_close' ticket.pk %}" data-confirm="Close this ticket?">
+        {% csrf_token %}<button class="btn btn-ghost btn-sm" type="submit">My issue is solved — close ticket</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

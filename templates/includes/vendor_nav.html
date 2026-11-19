@@ -1,0 +1,14 @@
+{% load core_tags %}<nav class="side-nav" aria-label="Seller navigation">
+  <div class="side-nav__title">Seller hub</div>
+  <ul>
+    <li><a class="{% active_link 'accounts:vendor_dashboard' %}" href="{% url 'accounts:vendor_dashboard' %}">{% include "includes/icon.html" with name="grid" %}Dashboard</a></li>
+    <li><a class="{% active_link 'products:vendor_list' 'products:create' 'products:update' 'products:delete' %}" href="{% url 'products:vendor_list' %}">{% include "includes/icon.html" with name="box" %}Products</a></li>
+    <li><a class="{% active_link 'products:inventory' %}" href="{% url 'products:inventory' %}">{% include "includes/icon.html" with name="layers" %}Inventory</a></li>
+    <li><a class="{% active_link 'orders:vendor_order_list' 'orders:vendor_order_detail' %}" href="{% url 'orders:vendor_order_list' %}">{% include "includes/icon.html" with name="orders" %}Orders</a></li>
+    <li><a class="{% active_link 'analytics:vendor_dashboard' %}" href="{% url 'analytics:vendor_dashboard' %}">{% include "includes/icon.html" with name="chart" %}Analytics</a></li>
+    <li><a class="{% active_link 'products:vendor_reviews' %}" href="{% url 'products:vendor_reviews' %}">{% include "includes/icon.html" with name="star" %}Reviews</a></li>
+    <li><a class="{% active_link 'products:vendor_questions' %}" href="{% url 'products:vendor_questions' %}">{% include "includes/icon.html" with name="chat" %}Questions</a></li>
+    <li><a class="{% active_link 'accounts:vendor_profile' %}" href="{% url 'accounts:vendor_profile' %}">{% include "includes/icon.html" with name="settings" %}Store settings</a></li>
+    <li><a href="{{ user.vendor_profile.get_store_url }}">{% include "includes/icon.html" with name="store" %}View storefront</a></li>
+  </ul>
+</nav>

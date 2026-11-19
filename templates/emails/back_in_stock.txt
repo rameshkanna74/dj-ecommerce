@@ -1,0 +1,11 @@
+{% autoescape off %}Back in stock: {{ product.name }}
+Hi {{ user.first_name|default:user.username }},
+
+Good news: {{ product.name }} is available again.
+
+Shop now: {{ url }}
+
+You received this email because you asked to be notified. This was a one-time alert.
+
+The {{ site_name }} team
+{% endautoescape %}

@@ -1,0 +1,18 @@
+<ol class="thread">
+  <li><article class="bubble">
+    <header><strong>{{ ticket.user.display_name }}</strong><time class="text-muted" datetime="{{ ticket.created_at|date:'c' }}">{{ ticket.created_at|date:"M j, Y g:i a" }}</time></header>
+    <p>{{ ticket.message }}</p>
+  </article></li>
+  {% for entry in history %}
+    {% if entry.body %}
+    <li><article class="bubble{% if entry.is_staff_reply %} bubble--staff{% endif %}">
+      <header><strong>{% if entry.is_staff_reply %}CoreCart Support{% else %}{{ entry.author.display_name|default:"Customer" }}{% endif %}</strong>
+        <time class="text-muted" datetime="{{ entry.created_at|date:'c' }}">{{ entry.created_at|date:"M j, Y g:i a" }}</time></header>
+      <p>{{ entry.body }}</p>
+    </article></li>
+    {% endif %}
+    {% if entry.status_change %}
+      <li class="thread-event">Status changed to <strong>{{ entry.get_status_change_display }}</strong> · {{ entry.created_at|date:"M j, g:i a" }}</li>
+    {% endif %}
+  {% endfor %}
+</ol>

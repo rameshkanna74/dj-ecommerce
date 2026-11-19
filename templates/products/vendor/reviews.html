@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Customer reviews{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/vendor_nav.html" %}
+  <div>
+    <div class="page-head">
+      <div><h1>Customer reviews</h1><p>Feedback on your products. Hidden reviews were removed by moderation.</p></div>
+      <div class="chips">
+        <a class="chip {% if not rating_filter %}is-active{% endif %}" href="{% url 'products:vendor_reviews' %}">All</a>
+        {% for n in "54321" %}<a class="chip {% if rating_filter == n %}is-active{% endif %}" href="?rating={{ n }}">{{ n }}&#9733;</a>{% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      {% for review in reviews %}
+        <article class="review">
+          <header>{% include "includes/stars.html" with rating=review.rating %}<a href="{{ review.product.get_absolute_url }}"><strong>{{ review.product.name }}</strong></a>
+            <span class="text-sm text-muted">by {{ review.user.first_name|default:review.user.username }} · {{ review.created_at|date:"M j, Y" }}</span>
+            {% if review.is_verified_purchase %}<span class="badge badge--success">Verified</span>{% endif %}
+            {% if not review.is_visible %}<span class="badge">Hidden</span>{% endif %}</header>
+          <p>{{ review.comment }}</p>
+        </article>
+      {% empty %}
+        <p class="text-muted mb-0">No reviews yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Store settings{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/vendor_nav.html" %}
+  <div>
+    <div class="page-head">
+      <div><h1>Store settings</h1><p>Your public store is at <a href="{{ vendor.get_store_url }}">{{ request.get_host }}{{ vendor.get_store_url }}</a></p></div>
+    </div>
+    <form method="post" enctype="multipart/form-data" novalidate data-submit-once class="stack">
+      {% csrf_token %}
+      {% include "includes/form_errors.html" with form=profile_form %}
+      {% include "includes/form_errors.html" with form=user_form %}
+      <section class="card">
+        <h2 class="text-sm eyebrow">Storefront</h2>
+        {{ profile_form.business_name.as_field_group }}
+        {{ profile_form.business_description.as_field_group }}
+        <div class="form-grid">
+          {{ profile_form.business_logo.as_field_group }}
+          {{ profile_form.business_banner.as_field_group }}
+        </div>
+      </section>
+      <section class="card">
+        <h2 class="text-sm eyebrow">Business contact &amp; address</h2>
+        <div class="form-grid">
+          {{ profile_form.business_email.as_field_group }}
+          {{ profile_form.business_phone.as_field_group }}
+          <div class="span-2">{{ profile_form.business_address.as_field_group }}</div>
+          {{ profile_form.business_city.as_field_group }}
+          {{ profile_form.business_state.as_field_group }}
+          {{ profile_form.business_zip_code.as_field_group }}
+          {{ profile_form.business_country.as_field_group }}
+        </div>
+      </section>
+      <section class="card">
+        <h2 class="text-sm eyebrow">Registration</h2>
+        <div class="form-grid">
+          {{ profile_form.tax_id.as_field_group }}
+          {{ profile_form.business_registration_number.as_field_group }}
+        </div>
+        <dl class="dl-grid">
+          <dt>Approval status</dt><dd>{{ vendor.get_approval_status_display }}{% if vendor.approved_at %} since {{ vendor.approved_at|date:"M j, Y" }}{% endif %}</dd>
+          <dt>Commission rate</dt><dd>{{ vendor.commission_rate|floatformat:2 }}% (set by CoreCart)</dd>
+          <dt>Store URL</dt><dd class="mono">{{ vendor.store_slug }}</dd>
+        </dl>
+      </section>
+      <section class="card">
+        <h2 class="text-sm eyebrow">Account owner</h2>
+        <div class="form-grid">
+          {{ user_form.first_name.as_field_group }}
+          {{ user_form.last_name.as_field_group }}
+          {{ user_form.email.as_field_group }}
+          {{ user_form.phone.as_field_group }}
+          <div class="span-2">{{ user_form.avatar.as_field_group }}</div>
+        </div>
+      </section>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">Save settings</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

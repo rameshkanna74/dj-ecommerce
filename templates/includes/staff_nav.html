@@ -1,0 +1,14 @@
+{% load core_tags %}<nav class="side-nav" aria-label="Administration">
+  <div class="side-nav__title">Administration</div>
+  <ul>
+    <li><a class="{% active_link 'analytics:admin_dashboard' %}" href="{% url 'analytics:admin_dashboard' %}">{% include "includes/icon.html" with name="chart" %}Dashboard</a></li>
+    <li><a class="{% active_link 'support:staff_ticket_list' 'support:staff_ticket_detail' %}" href="{% url 'support:staff_ticket_list' %}">{% include "includes/icon.html" with name="chat" %}Support queue</a></li>
+    <li><a href="{% url 'admin:orders_order_changelist' %}">{% include "includes/icon.html" with name="orders" %}Orders</a></li>
+    <li><a href="{% url 'admin:accounts_vendorprofile_changelist' %}?approval_status__exact=pending">{% include "includes/icon.html" with name="store" %}Vendor approvals</a></li>
+    <li><a href="{% url 'admin:products_product_changelist' %}">{% include "includes/icon.html" with name="box" %}Products</a></li>
+    <li><a href="{% url 'admin:products_category_changelist' %}">{% include "includes/icon.html" with name="layers" %}Categories</a></li>
+    <li><a href="{% url 'admin:orders_coupon_changelist' %}">{% include "includes/icon.html" with name="star" %}Coupons</a></li>
+    <li><a href="{% url 'admin:products_review_changelist' %}">{% include "includes/icon.html" with name="star" %}Review moderation</a></li>
+    <li><a href="{% url 'admin:accounts_customuser_changelist' %}">{% include "includes/icon.html" with name="user" %}Users</a></li>
+  </ul>
+</nav>

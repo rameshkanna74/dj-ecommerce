@@ -1,0 +1,11 @@
+{% load core_tags %}<nav class="side-nav" aria-label="Account navigation">
+  <div class="side-nav__title">My account</div>
+  <ul>
+    <li><a class="{% active_link 'accounts:customer_dashboard' %}" href="{% url 'accounts:customer_dashboard' %}">{% include "includes/icon.html" with name="grid" %}Overview</a></li>
+    <li><a class="{% active_link 'orders:list' 'orders:detail' %}" href="{% url 'orders:list' %}">{% include "includes/icon.html" with name="orders" %}Orders</a></li>
+    <li><a class="{% active_link 'accounts:wishlist' %}" href="{% url 'accounts:wishlist' %}">{% include "includes/icon.html" with name="heart" %}Wishlist</a></li>
+    <li><a class="{% active_link 'support:ticket_list' 'support:ticket_detail' 'support:ticket_create' %}" href="{% url 'support:ticket_list' %}">{% include "includes/icon.html" with name="chat" %}Support</a></li>
+    <li><a class="{% active_link 'accounts:customer_profile' %}" href="{% url 'accounts:customer_profile' %}">{% include "includes/icon.html" with name="user" %}Profile &amp; address</a></li>
+    <li><a class="{% active_link 'accounts:password_change' %}" href="{% url 'accounts:password_change' %}">{% include "includes/icon.html" with name="lock" %}Password</a></li>
+  </ul>
+</nav>

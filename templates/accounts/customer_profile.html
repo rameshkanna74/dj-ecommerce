@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Profile &amp; address{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/account_nav.html" %}
+  <div>
+    <div class="page-head"><div><h1>Profile &amp; address</h1><p>Your details and default delivery address.</p></div></div>
+    <form method="post" enctype="multipart/form-data" novalidate data-submit-once class="stack">
+      {% csrf_token %}
+      {% include "includes/form_errors.html" with form=user_form %}
+      {% include "includes/form_errors.html" with form=profile_form %}
+      <section class="card">
+        <h2 class="text-sm eyebrow">Personal details</h2>
+        <div class="form-grid">
+          {{ user_form.first_name.as_field_group }}
+          {{ user_form.last_name.as_field_group }}
+          {{ user_form.email.as_field_group }}
+          {{ user_form.phone.as_field_group }}
+          <div class="span-2">{{ user_form.avatar.as_field_group }}</div>
+        </div>
+      </section>
+      <section class="card">
+        <h2 class="text-sm eyebrow">Default delivery address</h2>
+        <div class="form-grid">
+          <div class="span-2">{{ profile_form.address.as_field_group }}</div>
+          {{ profile_form.city.as_field_group }}
+          {{ profile_form.state.as_field_group }}
+          {{ profile_form.zip_code.as_field_group }}
+          {{ profile_form.country.as_field_group }}
+        </div>
+      </section>
+      <section class="card">
+        <h2 class="text-sm eyebrow">Preferences</h2>
+        {{ profile_form.email_notifications.as_field_group }}
+        {{ profile_form.newsletter_subscribed.as_field_group }}
+      </section>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">Save changes</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

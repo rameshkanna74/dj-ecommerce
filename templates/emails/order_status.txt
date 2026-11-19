@@ -1,0 +1,10 @@
+{% autoescape off %}Order {{ order.order_number }} is now {{ order.get_status_display|lower }}
+Hi {{ order.customer_name }},
+
+The status of your order {{ order.order_number }} is now: {{ order.get_status_display }}.
+{% if order.tracking_number %}Tracking number: {{ order.tracking_number }}
+{% endif %}
+View your order: {{ url }}
+
+The {{ site_name }} team
+{% endautoescape %}

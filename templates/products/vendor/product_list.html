@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}My products{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/vendor_nav.html" %}
+  <div>
+    <div class="page-head">
+      <div><h1>Products</h1><p>{{ paginator.count }} product{{ paginator.count|pluralize }}</p></div>
+      <a class="btn btn-primary" href="{% url 'products:create' %}">Add product</a>
+    </div>
+    <form method="get" class="toolbar">
+      <div class="cluster">
+        <label class="visually-hidden" for="q">Search your products</label>
+        <input id="q" type="search" name="q" value="{{ query }}" placeholder="Search by name">
+        <label class="visually-hidden" for="status">Status</label>
+        <select id="status" name="status" data-autosubmit>
+          <option value="">All statuses</option>
+          <option value="active" {% if status_filter == "active" %}selected{% endif %}>Active</option>
+          <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>Hidden</option>
+        </select>
+        <button class="btn btn-sm" type="submit">Filter</button>
+      </div>
+    </form>
+    {% if products %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th scope="col">Product</th><th scope="col">Category</th><th scope="col" class="num">Price</th><th scope="col" class="num">Stock</th><th scope="col" class="num">Sold</th><th scope="col">Rating</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+        <tbody>
+        {% for product in products %}
+          <tr>
+            <td><div class="cell-product"><span class="thumb">{% if product.cover_image %}<img src="{{ product.cover_image.url }}" alt="">{% else %}<span class="placeholder-img">{% include "includes/icon.html" with name="image" %}</span>{% endif %}</span><span><strong>{{ product.name }}</strong>{% if product.has_variants %}<br><small class="text-muted">{{ product.active_variants|length }} option{{ product.active_variants|length|pluralize }}</small>{% endif %}</span></div></td>
+            <td>{{ product.category.name }}</td>
+            <td class="num">{{ product.price|money }}</td>
+            <td class="num"><span class="stock {% if product.total_available_stock == 0 %}stock--out{% elif product.is_low_stock %}stock--low{% endif %}">{{ product.total_available_stock }}</span></td>
+            <td class="num">{{ product.units_sold }}</td>
+            <td>{% if product.review_count %}{{ product.average_rating|floatformat:1 }} ({{ product.review_count }}){% else %}<span class="text-muted">&mdash;</span>{% endif %}</td>
+            <td>{% if product.is_active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge">Hidden</span>{% endif %}</td>
+            <td class="nowrap">
+              {% if product.is_active %}<a href="{{ product.get_absolute_url }}">View</a> · {% endif %}
+              <a href="{% url 'products:update' product.pk %}">Edit</a> ·
+              <a href="{% url 'products:delete' product.pk %}" class="text-muted">Delete</a>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/pagination.html" %}
+    {% else %}
+      {% url 'products:create' as create_url %}
+      {% include "includes/empty_state.html" with title="No products found" text="Add your first product to start selling on CoreCart." action_url=create_url action_label="Add product" %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load core_tags chart_tags %}
+{% block title %}Seller dashboard{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/vendor_nav.html" %}
+  <div class="stack-lg">
+    <div class="page-head">
+      <div><h1>{{ vendor.business_name }}</h1><p>Performance over the last {{ days }} days and all-time totals.</p></div>
+      <a class="btn btn-primary" href="{% url 'products:create' %}">Add product</a>
+    </div>
+
+    <dl class="kpis">
+      <div class="kpi kpi--accent"><dt>Net revenue</dt><dd>{{ kpis.revenue|money }}</dd><small>Paid orders, after commission</small></div>
+      <div class="kpi"><dt>Gross sales</dt><dd>{{ kpis.gross_sales|money }}</dd><small>All non-cancelled items</small></div>
+      <div class="kpi"><dt>Units sold</dt><dd>{{ kpis.units_sold }}</dd></div>
+      <div class="kpi"><dt>Orders</dt><dd>{{ kpis.total_orders }}</dd><small>{{ kpis.pending_orders }} pending</small></div>
+      <div class="kpi"><dt>Products</dt><dd>{{ kpis.total_products }}</dd><small>{{ kpis.active_products }} active · {{ kpis.out_of_stock }} out of stock</small></div>
+      <div class="kpi"><dt>To fulfil</dt><dd>{{ kpis.items_to_fulfil }}</dd><small>Pending or processing items</small></div>
+      <div class="kpi"><dt>Rating</dt><dd>{{ kpis.average_rating|floatformat:1 }}</dd><small>{{ kpis.review_count }} review{{ kpis.review_count|pluralize }}</small></div>
+      <div class="kpi"><dt>Commission</dt><dd>{{ vendor.commission_rate|floatformat:1 }}%</dd><small>Platform fee per sale</small></div>
+    </dl>
+
+    <section class="card">
+      <div class="card-head"><h2>Sales, last {{ days }} days</h2><a href="{% url 'analytics:vendor_dashboard' %}">Full analytics</a></div>
+      {% line_chart sales_trend "Daily gross sales" %}
+    </section>
+
+    <div class="grid-2">
+      <section class="card">
+        <div class="card-head"><h2>Best sellers</h2></div>
+        {% bar_chart best_sellers "Best-selling products" %}
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Recent order items</h2><a href="{% url 'orders:vendor_order_list' %}">All orders</a></div>
+        {% if recent_items %}
+          <ul class="thread">
+          {% for item in recent_items %}
+            <li class="split text-sm">
+              <span><a class="mono" href="{% url 'orders:vendor_order_detail' item.order.order_number %}">{{ item.order.order_number }}</a> · {{ item.quantity }}&times; {{ item.display_name|truncatechars:28 }}</span>
+              <span class="badge badge--{{ item.status|status_tone }}">{{ item.get_status_display }}</span>
+            </li>
+          {% endfor %}
+          </ul>
+        {% else %}<p class="text-muted">No orders yet. Share your storefront to get started.</p>{% endif %}
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

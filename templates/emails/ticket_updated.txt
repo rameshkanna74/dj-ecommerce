@@ -1,0 +1,12 @@
+{% autoescape off %}Update on support ticket #{{ ticket.pk }}
+Hi {{ ticket.user.display_name }},
+
+Your ticket "{{ ticket.subject }}" has been updated. Current status: {{ ticket.get_status_display }}.
+{% if message.body %}
+Our reply:
+{{ message.body }}
+{% endif %}
+View the conversation: {{ url }}
+
+The {{ site_name }} team
+{% endautoescape %}

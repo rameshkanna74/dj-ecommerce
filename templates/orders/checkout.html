@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Checkout{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Checkout</h1><p>Review your order, add delivery details and choose how to pay.</p></div><a href="{% url 'cart:view' %}">&larr; Back to cart</a></div>
+
+{% if summary.problems %}
+  <div class="alert alert--error" role="alert"><div><p><strong>Some items can't be ordered right now:</strong></p><ul>{% for p in summary.problems %}<li>{{ p }}</li>{% endfor %}</ul><p><a href="{% url 'cart:view' %}">Update your cart</a> to continue.</p></div></div>
+{% endif %}
+
+<div class="checkout">
+  <form method="post" novalidate data-submit-once class="stack-lg" id="checkout-form">
+    {% csrf_token %}
+    {{ form.checkout_token }}
+    {% include "includes/form_errors.html" %}
+    <section class="card">
+      <h2 class="card-head">1. Delivery details</h2>
+      <div class="form-grid">
+        {{ form.full_name.as_field_group }}
+        {{ form.phone.as_field_group }}
+        <div class="span-2">{{ form.address.as_field_group }}</div>
+        {{ form.city.as_field_group }}
+        {{ form.state.as_field_group }}
+        {{ form.postal_code.as_field_group }}
+        {{ form.country.as_field_group }}
+        <div class="span-2">{{ form.customer_note.as_field_group }}</div>
+      </div>
+      {{ form.save_address.as_field_group }}
+    </section>
+    <section class="card choice-cards">
+      <h2 class="card-head">2. Payment</h2>
+      {{ form.payment_method.as_field_group }}
+      <p class="text-sm text-muted mb-0">You won't be charged online. Your order is marked as paid only after we receive your payment.</p>
+    </section>
+    <button class="btn btn-primary btn-lg btn-block" type="submit" data-loading-text="Placing order…" {% if summary.problems %}disabled{% endif %}>Place order · {{ summary.total|money }}</button>
+  </form>
+
+  <aside class="card" aria-labelledby="summary-title">
+    <h2 id="summary-title" class="card-head">Order summary</h2>
+    {% for item in summary.items %}
+      <div class="order-line">
+        <span class="thumb">{% if item.product.cover_image %}<img src="{{ item.product.cover_image.url }}" alt="">{% else %}<span class="placeholder-img">{% include "includes/icon.html" with name="image" %}</span>{% endif %}</span>
+        <div class="grow text-sm"><strong>{{ item.product.name }}</strong>{% if item.variant %}<br><span class="text-muted">{{ item.variant.label }}</span>{% endif %}<br><span class="text-muted">Qty {{ item.quantity }} × {{ item.unit_price|money }}</span></div>
+        <span class="price text-sm">{{ item.subtotal|money }}</span>
+      </div>
+    {% endfor %}
+    <hr>
+    {% if summary.coupon %}
+      <div class="split text-sm">
+        <span class="badge badge--success">Coupon {{ summary.coupon.code }}</span>
+        <form method="post" action="{% url 'orders:remove_coupon' %}">{% csrf_token %}<button class="link-button" type="submit">Remove</button></form>
+      </div>
+    {% else %}
+      <form method="post" action="{% url 'orders:apply_coupon' %}" class="stack" novalidate>
+        {% csrf_token %}
+        <label class="field__label" for="{{ coupon_form.code.id_for_label }}">Coupon code</label>
+        <div class="search-form">{{ coupon_form.code }}<button class="btn" type="submit">Apply</button></div>
+      </form>
+    {% endif %}
+    <dl class="summary-list mt-4">
+      <div><dt>Subtotal</dt><dd>{{ summary.subtotal|money }}</dd></div>
+      {% if summary.discount %}<div class="discount"><dt>Discount</dt><dd>&minus;{{ summary.discount|money }}</dd></div>{% endif %}
+      <div><dt>Delivery</dt><dd>Free</dd></div>
+      <div class="total"><dt>Total</dt><dd>{{ summary.total|money }}</dd></div>
+    </dl>
+  </aside>
+</div>
+{% endblock %}

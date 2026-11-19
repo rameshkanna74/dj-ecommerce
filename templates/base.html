@@ -1,0 +1,121 @@
+{% load static core_tags %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CoreCart{% endblock %} · CoreCart</title>
+  <meta name="description" content="{% block meta_description %}CoreCart is a curated multi-vendor marketplace for quality goods from independent sellers.{% endblock %}">
+  <meta name="theme-color" content="#1f3a5f">
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-bar">
+      <button class="icon-link nav-toggle" type="button" data-nav-toggle aria-controls="mobile-panel" aria-expanded="false">
+        {% include "includes/icon.html" with name="menu" %}<span class="visually-hidden">Menu</span>
+      </button>
+      <a class="logo" href="{% url 'core:home' %}"><span class="logo-mark" aria-hidden="true">C</span>CoreCart</a>
+
+      <div class="header-search" role="search">
+        {% include "includes/search_form.html" with field_id="search-desktop" %}
+      </div>
+
+      <nav class="header-actions" aria-label="Account">
+        <a class="icon-link hide-mobile" href="{% url 'products:list' %}">Shop</a>
+        {% if user.is_authenticated %}
+          {% if user.is_customer %}
+            <a class="icon-link" href="{% url 'accounts:wishlist' %}" aria-label="Wishlist">{% include "includes/icon.html" with name="heart" %}</a>
+          {% endif %}
+          {% include "includes/account_menu.html" %}
+        {% else %}
+          <a class="icon-link" href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}">{% include "includes/icon.html" with name="user" %}<span class="hide-mobile">Sign in</span></a>
+        {% endif %}
+        {% if not user.is_authenticated or user.is_customer %}
+          <a class="icon-link" href="{% url 'cart:view' %}" aria-label="Cart, {{ cart_count }} item{{ cart_count|pluralize }}">
+            {% include "includes/icon.html" with name="cart" %}
+            {% if cart_count %}<span class="count-badge" aria-hidden="true">{{ cart_count }}</span>{% endif %}
+          </a>
+        {% endif %}
+      </nav>
+    </div>
+
+    <div class="container mobile-panel" id="mobile-panel">
+      <div role="search" class="stack">{% include "includes/search_form.html" with field_id="search-mobile" %}</div>
+      <nav aria-label="Mobile">
+        <a href="{% url 'products:list' %}">All products</a>
+        {% for category in nav_categories %}<a href="{% url 'products:list' %}?category={{ category.slug }}">{{ category.name }}</a>{% endfor %}
+        {% if not user.is_authenticated %}<a href="{% url 'accounts:register' %}">Create an account</a>{% endif %}
+      </nav>
+    </div>
+
+    {% if nav_categories %}
+    <nav class="category-nav" aria-label="Categories">
+      <div class="container">
+        <ul>
+          <li><a href="{% url 'products:list' %}" class="{% if request.resolver_match.view_name == 'products:list' and not request.GET.category %}is-active{% endif %}">All products</a></li>
+          {% for category in nav_categories %}
+            <li><a href="{% url 'products:list' %}?category={{ category.slug }}" class="{% if request.GET.category == category.slug %}is-active{% endif %}">{{ category.name }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </nav>
+    {% endif %}
+  </header>
+
+  <main id="main" class="site-main" tabindex="-1">
+    <div class="container">
+      {% include "includes/messages.html" %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a class="logo" href="{% url 'core:home' %}"><span class="logo-mark" aria-hidden="true">C</span>CoreCart</a>
+          <p>A curated marketplace connecting independent sellers with people who care about quality.</p>
+        </div>
+        <div>
+          <h2>Shop</h2>
+          <ul>
+            <li><a href="{% url 'products:list' %}">All products</a></li>
+            <li><a href="{% url 'products:list' %}?sort=popular">Best sellers</a></li>
+            <li><a href="{% url 'products:list' %}?sort=newest">New arrivals</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Account</h2>
+          <ul>
+            {% if user.is_authenticated %}
+              <li><a href="{% url 'accounts:dashboard' %}">Dashboard</a></li>
+              <li><a href="{% url 'support:ticket_list' %}">Support</a></li>
+            {% else %}
+              <li><a href="{% url 'accounts:login' %}">Sign in</a></li>
+              <li><a href="{% url 'accounts:customer_register' %}">Create account</a></li>
+            {% endif %}
+          </ul>
+        </div>
+        <div>
+          <h2>Sell</h2>
+          <ul>
+            <li><a href="{% url 'accounts:vendor_register' %}">Become a seller</a></li>
+            <li><a href="{% url 'core:about' %}">About CoreCart</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; {% now "Y" %} CoreCart. All rights reserved.</span>
+        <span>Secure checkout · Cash on delivery &amp; bank transfer</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="{% static 'js/app.js' %}" defer></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,27 @@
+{% load core_tags %}<article class="product-card">
+  <a class="product-card__media" href="{{ product.get_absolute_url }}" tabindex="-1" aria-hidden="true">
+    {% if product.cover_image %}<img src="{{ product.cover_image.url }}" alt="" loading="lazy" width="400" height="400">
+    {% else %}<div class="placeholder-img">{% include "includes/icon.html" with name="image" %}</div>{% endif %}
+    <span class="product-card__flags">
+      {% if not product.is_in_stock %}<span class="badge badge--danger">Sold out</span>
+      {% elif product.is_low_stock %}<span class="badge badge--warning">Low stock</span>{% endif %}
+      {% if product.is_featured %}<span class="badge badge--primary">Featured</span>{% endif %}
+    </span>
+  </a>
+  <div class="product-card__body">
+    <span class="product-card__meta">{{ product.vendor.business_name|default:"CoreCart" }}</span>
+    <h3 class="product-card__title"><a href="{{ product.get_absolute_url }}">{{ product.name }}</a></h3>
+    {% if product.review_count %}
+      <span class="rating">{% include "includes/stars.html" with rating=product.average_rating %}<span>({{ product.review_count }})</span></span>
+    {% endif %}
+    <div class="product-card__footer">
+      <span class="price">{% if product.has_variants %}<small class="text-muted">From </small>{% endif %}{{ product.price|money }}</span>
+      {% if show_cart_button and product.is_in_stock and not product.has_variants and user.is_customer %}
+        <form method="post" action="{% url 'cart:add' product.pk %}">
+          {% csrf_token %}<input type="hidden" name="quantity" value="1"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button class="btn btn-sm btn-primary" type="submit" aria-label="Add {{ product.name }} to cart">Add</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</article>

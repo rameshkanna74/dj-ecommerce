@@ -1,0 +1,7 @@
+{% autoescape off %}New support ticket #{{ ticket.pk }}: {{ ticket.subject }}
+A new ticket was opened by {{ ticket.user.username }} ({{ ticket.user.email }}).
+
+{{ ticket.message }}
+
+Respond: {{ url }}
+{% endautoescape %}

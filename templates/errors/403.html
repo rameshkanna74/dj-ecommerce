@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Access denied{% endblock %}
+{% block content %}
+<div class="auth-shell">
+  {% url 'accounts:dashboard' as dashboard_url %}
+  {% include "includes/empty_state.html" with icon="lock" title="You don't have access to this page" text="This area is reserved for a different type of account." action_url=dashboard_url action_label="Go to my dashboard" %}
+</div>
+{% endblock %}

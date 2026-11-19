@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Orders to fulfil{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/vendor_nav.html" %}
+  <div>
+    <div class="page-head">
+      <div><h1>Orders</h1><p>Each line is one of your items. Update its status as you fulfil it.</p></div>
+      <a class="btn" href="{% url 'analytics:vendor_export_sales' %}">Export CSV</a>
+    </div>
+    <div class="toolbar">
+      <div class="chips">
+        <a class="chip {% if not status_filter %}is-active{% endif %}" href="{% url 'orders:vendor_order_list' %}">All</a>
+        {% for value, label, count in status_counts %}<a class="chip {% if status_filter == value %}is-active{% endif %}" href="?status={{ value }}">{{ label }} ({{ count }})</a>{% endfor %}
+      </div>
+      <form method="get" class="cluster">
+        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        <label class="visually-hidden" for="q">Search orders</label>
+        <input id="q" type="search" name="q" value="{{ query }}" placeholder="Order number or product">
+        <button class="btn btn-sm" type="submit">Search</button>
+      </form>
+    </div>
+    {% if order_items %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th scope="col">Order</th><th scope="col">Date</th><th scope="col">Product</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Total</th><th scope="col">Item status</th><th scope="col">Payment</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+        <tbody>
+        {% for item in order_items %}
+          <tr>
+            <td><a class="mono" href="{% url 'orders:vendor_order_detail' item.order.order_number %}">{{ item.order.order_number }}</a></td>
+            <td class="nowrap">{{ item.order.created_at|date:"M j, Y" }}</td>
+            <td>{{ item.display_name }}{% if item.variant_label %}<br><small class="text-muted">{{ item.variant_label }}</small>{% endif %}</td>
+            <td class="num">{{ item.quantity }}</td>
+            <td class="num">{{ item.subtotal|money }}</td>
+            <td><span class="badge badge--{{ item.status|status_tone }}">{{ item.get_status_display }}</span></td>
+            <td><span class="badge badge--{{ item.order.payment_status|status_tone }}">{{ item.order.get_payment_status_display }}</span></td>
+            <td><a href="{% url 'orders:vendor_order_detail' item.order.order_number %}">Manage</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/pagination.html" %}
+    {% else %}
+      {% include "includes/empty_state.html" with icon="orders" title="No orders here" text="Orders for your products will appear here as soon as customers check out." %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

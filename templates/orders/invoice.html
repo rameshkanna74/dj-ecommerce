@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Invoice {{ order.order_number }}{% endblock %}
+{% block content %}
+<div class="cluster no-print justify-end mb-4">
+  <button class="btn" type="button" data-print>Print / save as PDF</button>
+</div>
+<article class="invoice">
+  <header class="invoice-head">
+    <div>
+      <span class="logo"><span class="logo-mark" aria-hidden="true">C</span>CoreCart</span>
+      <p class="text-sm text-muted">CoreCart Marketplace</p>
+    </div>
+    <div class="text-right">
+      <h1 class="mb-0">Invoice</h1>
+      <p class="mono mb-0">{{ order.order_number }}</p>
+      <p class="text-sm text-muted">Issued {{ order.created_at|date:"F j, Y" }}</p>
+    </div>
+  </header>
+  <div class="grid-2">
+    <div>
+      <h2 class="text-sm eyebrow">Bill &amp; ship to</h2>
+      <address><strong>{{ order.customer_name }}</strong><br>{% for line in order.shipping_lines %}{{ line }}<br>{% endfor %}{{ order.shipping_phone }}<br>{{ order.customer_email }}</address>
+    </div>
+    <div>
+      <h2 class="text-sm eyebrow">Payment</h2>
+      <dl class="dl-grid">
+        <dt>Method</dt><dd>{{ order.get_payment_method_display }}</dd>
+        <dt>Status</dt><dd>{{ order.get_payment_status_display }}</dd>
+        {% if order.paid_at %}<dt>Paid on</dt><dd>{{ order.paid_at|date:"M j, Y" }}</dd>{% endif %}
+        <dt>Order status</dt><dd>{{ order.get_status_display }}</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="table-wrap mt-5">
+    <table class="table">
+      <thead><tr><th scope="col">Item</th><th scope="col">Seller</th><th scope="col" class="num">Unit price</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Amount</th></tr></thead>
+      <tbody>
+      {% for item in order.items.all %}
+        <tr>
+          <td>{{ item.display_name }}{% if item.variant_label %} <small class="text-muted">({{ item.variant_label }})</small>{% endif %}{% if item.status == "cancelled" %} <span class="badge badge--danger">Cancelled</span>{% endif %}</td>
+          <td>{{ item.vendor.business_name|default:"CoreCart" }}</td>
+          <td class="num">{{ item.price|money }}</td>
+          <td class="num">{{ item.quantity }}</td>
+          <td class="num">{{ item.subtotal|money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="4" class="num">Subtotal</td><td class="num">{{ order.subtotal_amount|money }}</td></tr>
+        {% if order.discount_amount %}<tr><td colspan="4" class="num">Discount{% if order.coupon_code %} ({{ order.coupon_code }}){% endif %}</td><td class="num">&minus;{{ order.discount_amount|money }}</td></tr>{% endif %}
+        <tr><td colspan="4" class="num">Total</td><td class="num">{{ order.total_amount|money }}</td></tr>
+      </tfoot>
+    </table>
+  </div>
+  <p class="text-sm text-muted mt-5">Cancelled items are excluded from the totals. Thank you for shopping with CoreCart.</p>
+</article>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Customer questions{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/vendor_nav.html" %}
+  <div>
+    <div class="page-head"><div><h1>Customer questions</h1><p>Answers are published on the product page.</p></div></div>
+    <div class="stack">
+      {% for q in questions %}
+        <article class="card">
+          <div class="split"><a href="{{ q.product.get_absolute_url }}#questions"><strong>{{ q.product.name }}</strong></a>
+            <span>{% if q.is_answered %}<span class="badge badge--success">Answered</span>{% else %}<span class="badge badge--warning">Awaiting answer</span>{% endif %}
+            {% if not q.is_public %}<span class="badge">Hidden by moderation</span>{% endif %}</span></div>
+          <p class="mt-0"><strong>Q:</strong> {{ q.question }} <small class="text-muted">— {{ q.user.first_name|default:q.user.username }}, {{ q.created_at|date:"M j, Y" }}</small></p>
+          <form method="post" action="{% url 'products:answer_question' q.pk %}" novalidate>
+            {% csrf_token %}
+            <label class="field__label" for="answer-{{ q.pk }}">{% if q.is_answered %}Edit answer{% else %}Your answer{% endif %}</label>
+            <textarea id="answer-{{ q.pk }}" name="answer" rows="2" maxlength="2000" required>{{ q.answer }}</textarea>
+            <div class="form-actions"><button class="btn btn-primary btn-sm" type="submit">{% if q.is_answered %}Update answer{% else %}Publish answer{% endif %}</button></div>
+          </form>
+        </article>
+      {% empty %}
+        {% include "includes/empty_state.html" with icon="chat" title="No questions yet" text="Customer questions about your products will appear here." %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

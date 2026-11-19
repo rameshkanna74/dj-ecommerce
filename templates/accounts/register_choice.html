@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Create an account{% endblock %}
+{% block content %}
+<div class="auth-shell auth-shell--wide">
+  <div class="page-head"><div><h1>Join CoreCart</h1><p>Choose the type of account that fits you.</p></div></div>
+  <div class="role-cards">
+    <a class="role-card" href="{% url 'accounts:customer_register' %}">
+      {% include "includes/icon.html" with name="cart" %}
+      <h2>I want to shop</h2>
+      <ul><li>Track orders and download invoices</li><li>Save products to your wishlist</li><li>Review products you've bought</li></ul>
+      <span class="btn btn-primary">Create customer account</span>
+    </a>
+    <a class="role-card" href="{% url 'accounts:vendor_register' %}">
+      {% include "includes/icon.html" with name="store" %}
+      <h2>I want to sell</h2>
+      <ul><li>Your own branded storefront</li><li>Manage products, stock and orders</li><li>Sales analytics and CSV exports</li></ul>
+      <span class="btn">Apply as a seller</span>
+    </a>
+  </div>
+  <p class="text-muted text-sm">Already have an account? <a href="{% url 'accounts:login' %}">Sign in</a></p>
+</div>
+{% endblock %}

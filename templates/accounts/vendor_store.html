@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ vendor.business_name }}{% endblock %}
+{% block meta_description %}{{ vendor.business_description|truncatechars:150 }}{% endblock %}
+{% block content %}
+<section class="store-banner">
+  <div class="store-banner__img">{% if vendor.business_banner %}<img src="{{ vendor.business_banner.url }}" alt="">{% endif %}</div>
+  <div class="store-banner__body">
+    <div class="store-logo">{% if vendor.business_logo %}<img src="{{ vendor.business_logo.url }}" alt="{{ vendor.business_name }} logo">{% else %}{{ vendor.business_name|first|upper }}{% endif %}</div>
+    <div>
+      <h1 class="mb-0">{{ vendor.business_name }}</h1>
+      <p class="text-muted mb-0">{{ vendor.business_city }}, {{ vendor.business_country }} · {{ product_count }} product{{ product_count|pluralize }}</p>
+    </div>
+  </div>
+</section>
+{% if vendor.business_description %}<div class="prose"><p>{{ vendor.business_description }}</p></div>{% endif %}
+
+<section class="section">
+  {% if products %}
+    <div class="product-grid">{% for product in products %}{% include "includes/product_card.html" with show_cart_button=True %}{% endfor %}</div>
+    {% include "includes/pagination.html" %}
+  {% else %}
+    {% include "includes/empty_state.html" with title="No products yet" text="This store hasn't published any products yet." %}
+  {% endif %}
+</section>
+{% endblock %}

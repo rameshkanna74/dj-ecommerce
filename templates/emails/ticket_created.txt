@@ -1,0 +1,9 @@
+{% autoescape off %}Support ticket #{{ ticket.pk }} received
+Hi {{ ticket.user.display_name }},
+
+We received your ticket "{{ ticket.subject }}". Our team will reply soon.
+
+View your ticket: {{ url }}
+
+The {{ site_name }} team
+{% endautoescape %}

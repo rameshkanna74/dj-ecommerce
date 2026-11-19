@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block meta_description %}{{ product.description|truncatechars:155 }}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="{% url 'core:home' %}">Home</a></li>
+    <li><a href="{{ product.category.get_absolute_url }}">{{ product.category.name }}</a></li>
+    <li aria-current="page">{{ product.name|truncatechars:40 }}</li>
+  </ol>
+</nav>
+
+<div class="product-layout">
+  <section class="gallery" aria-label="Product images">
+    <div class="gallery__main">
+      {% if product.cover_image %}<img src="{{ product.cover_image.url }}" alt="{{ product.name }}" data-gallery-main width="800" height="800">
+      {% elif product.images.all %}<img src="{{ product.images.all.0.image.url }}" alt="{{ product.images.all.0.alt_text|default:product.name }}" data-gallery-main>
+      {% else %}<div class="placeholder-img">{% include "includes/icon.html" with name="image" %}</div>{% endif %}
+    </div>
+    {% if product.images.all %}
+    <div class="gallery__thumbs">
+      {% if product.cover_image %}<button type="button" data-gallery-thumb data-src="{{ product.cover_image.url }}" data-alt="{{ product.name }}" aria-pressed="true"><img src="{{ product.cover_image.url }}" alt=""><span class="visually-hidden">Show main image</span></button>{% endif %}
+      {% for image in product.images.all %}
+        <button type="button" data-gallery-thumb data-src="{{ image.image.url }}" data-alt="{{ image.alt_text|default:product.name }}" aria-pressed="{% if not product.cover_image and forloop.first %}true{% else %}false{% endif %}"><img src="{{ image.image.url }}" alt=""><span class="visually-hidden">Show image {{ forloop.counter }}</span></button>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="buy-box" aria-labelledby="product-title">
+    <div>
+      <span class="eyebrow">{{ product.category.name }}</span>
+      <h1 id="product-title">{{ product.name }}</h1>
+      <p class="vendor-line">Sold by {% if product.vendor %}<a href="{{ product.vendor.get_store_url }}">{{ product.vendor.business_name }}</a>{% else %}CoreCart{% endif %}</p>
+    </div>
+    {% if product.review_count %}
+      <a class="rating" href="#reviews">{% include "includes/stars.html" with rating=product.average_rating large=True %} <span>{{ product.average_rating|floatformat:1 }} · {{ product.review_count }} review{{ product.review_count|pluralize }}</span></a>
+    {% endif %}
+    <div class="price price--lg" data-product-price>{{ product.price|money }}</div>
+
+    <div class="purchase-panel">
+      {% if product.is_in_stock %}
+        {% if product.is_low_stock %}<p class="stock stock--low mb-0">Only {{ product.total_available_stock }} left in stock</p>
+        {% else %}<p class="stock stock--in mb-0">In stock</p>{% endif %}
+      {% else %}
+        <p class="stock stock--out mb-0">Currently out of stock</p>
+      {% endif %}
+
+      {% if not user.is_authenticated or user.is_customer %}
+        {% if product.is_in_stock %}
+        <form method="post" action="{% url 'cart:add' product.pk %}" class="stack" data-submit-once>
+          {% csrf_token %}
+          {% if product.has_variants %}
+            <fieldset class="variant-options">
+              <legend>Choose an option</legend>
+              {% for variant in product.active_variants %}
+                <label class="{% if variant.stock <= 0 %}is-unavailable{% endif %}">
+                  <input type="radio" name="variant" value="{{ variant.pk }}" required {% if variant.stock <= 0 %}disabled{% endif %} data-price="{{ variant.current_price|money }}" data-stock="{{ variant.stock }}">
+                  {{ variant.attribute_value }}{% if variant.price_override is not None %} · {{ variant.current_price|money }}{% endif %}
+                  <span class="visually-hidden">({{ variant.attribute_name }}{% if variant.stock <= 0 %}, sold out{% endif %})</span>
+                </label>
+              {% endfor %}
+            </fieldset>
+          {% endif %}
+          <div class="purchase-row">
+            <div>
+              <label for="qty">Quantity</label>
+              <div class="qty" data-qty>
+                <button type="button" data-step="-1" aria-label="Decrease quantity">&minus;</button>
+                <input id="qty" type="number" name="quantity" value="1" min="1" max="{% if product.has_variants %}99{% else %}{{ product.stock }}{% endif %}" inputmode="numeric" data-qty-input>
+                <button type="button" data-step="1" aria-label="Increase quantity">+</button>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-lg" type="submit" data-loading-text="Adding…">{% include "includes/icon.html" with name="cart" %}Add to cart</button>
+          </div>
+        </form>
+        {% elif user.is_authenticated %}
+          <form method="post" action="{% url 'products:stock_alert' product.pk %}">
+            {% csrf_token %}
+            {% if has_stock_alert %}<p class="text-sm text-muted mb-0">We'll email you when it's back.</p>
+            {% else %}<button class="btn btn-block" type="submit">Email me when it's back in stock</button>{% endif %}
+          </form>
+        {% else %}
+          <a class="btn btn-block" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Sign in to get a restock alert</a>
+        {% endif %}
+        {% if user.is_customer %}
+          <form method="post" action="{% url 'accounts:toggle_wishlist' product.pk %}">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}">
+            <button class="btn btn-ghost btn-block" type="submit" aria-pressed="{% if in_wishlist %}true{% else %}false{% endif %}">{% include "includes/icon.html" with name="heart" %}{% if in_wishlist %}Saved to wishlist{% else %}Save to wishlist{% endif %}</button>
+          </form>
+        {% endif %}
+      {% else %}
+        <p class="text-sm text-muted mb-0">Purchasing is available to customer accounts.</p>
+      {% endif %}
+    </div>
+    <ul class="text-sm text-muted">
+      <li>Pay by cash on delivery or bank transfer</li>
+      <li>Track every item from processing to delivery</li>
+    </ul>
+  </section>
+</div>
+
+<nav class="tabs-nav section" aria-label="Product sections">
+  <a href="#description">Description</a><a href="#reviews">Reviews ({{ product.review_count }})</a><a href="#questions">Questions ({{ questions|length }})</a>
+</nav>
+
+<section id="description" class="prose" aria-labelledby="desc-title">
+  <h2 id="desc-title">Description</h2>
+  <p>{{ product.description }}</p>
+</section>
+
+<section id="reviews" class="section" aria-labelledby="reviews-title">
+  <h2 id="reviews-title">Customer reviews</h2>
+  <div class="review-summary">
+    <div class="card">
+      {% if not product.review_count %}<p class="text-muted mb-0">No ratings yet.</p>{% else %}
+      <div class="rating-big">{{ product.average_rating|floatformat:1 }}</div>
+      {% include "includes/stars.html" with rating=product.average_rating large=True %}
+      <p class="text-sm text-muted">Based on {{ product.review_count }} review{{ product.review_count|pluralize }}</p>
+      <div class="bars">
+        {% for row in rating_breakdown %}
+          <div class="bar-row"><span>{{ row.stars }} star</span><span class="bar-track"><span class="bar-fill" style="width: {{ row.percent }}%"></span></span><span class="text-muted">{{ row.count }}</span></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="card">
+      {% if user.is_customer %}
+        {% if user_review %}
+          <div class="alert"><p>You reviewed this product{% if not user_review.is_visible %} (hidden by moderation){% endif %}. <a href="{% url 'products:edit_review' user_review.pk %}">Edit or delete your review</a></p></div>
+        {% else %}
+          <h3>Write a review</h3>
+          <form method="post" action="{% url 'products:add_review' product.pk %}" novalidate data-submit-once>
+            {% csrf_token %}
+            {{ review_form.rating.as_field_group }}
+            {{ review_form.comment.as_field_group }}
+            <button class="btn btn-primary" type="submit">Publish review</button>
+          </form>
+        {% endif %}
+      {% elif not user.is_authenticated %}
+        <p class="text-muted"><a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}%23reviews">Sign in</a> to write a review.</p>
+      {% endif %}
+      {% for review in reviews %}
+        <article class="review">
+          <header>{% include "includes/stars.html" with rating=review.rating %}<strong>{{ review.user.first_name|default:review.user.username }}</strong>
+            {% if review.is_verified_purchase %}<span class="badge badge--success">Verified purchase</span>{% endif %}
+            <time class="text-sm text-muted" datetime="{{ review.created_at|date:'c' }}">{{ review.created_at|date:"M j, Y" }}</time></header>
+          <p>{{ review.comment }}</p>
+        </article>
+      {% empty %}
+        <p class="text-muted">No reviews yet. Be the first to share your thoughts.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section id="questions" class="section" aria-labelledby="qa-title">
+  <h2 id="qa-title">Questions &amp; answers</h2>
+  <div class="card">
+    {% if user.is_customer %}
+      <form method="post" action="{% url 'products:ask_question' product.pk %}" novalidate data-submit-once>
+        {% csrf_token %}{{ question_form.question.as_field_group }}
+        <button class="btn" type="submit">Ask the seller</button>
+      </form>
+    {% endif %}
+    <dl>
+      {% for q in questions %}
+        <div class="qa">
+          <dt>Q: {{ q.question }}</dt>
+          {% if q.is_answered %}<dd>A: {{ q.answer }}<br><small>{{ q.answered_at|date:"M j, Y" }}</small></dd>
+          {% else %}<dd>Awaiting an answer from the seller.</dd>{% endif %}
+        </div>
+      {% empty %}
+        <p class="text-muted">No questions yet.</p>
+      {% endfor %}
+    </dl>
+  </div>
+</section>
+
+{% if related_products %}
+<section class="section" aria-labelledby="related-title">
+  <div class="section-head"><h2 id="related-title">You may also like</h2></div>
+  <div class="product-grid">{% for product in related_products %}{% include "includes/product_card.html" with show_cart_button=True %}{% endfor %}</div>
+</section>
+{% endif %}
+
+{% if recently_viewed %}
+<section class="section" aria-labelledby="recent-title">
+  <div class="section-head"><h2 id="recent-title">Recently viewed</h2></div>
+  <div class="product-grid">{% for product in recently_viewed %}{% include "includes/product_card.html" %}{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}

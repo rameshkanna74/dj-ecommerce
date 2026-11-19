@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Your cart{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Your cart</h1><p>{{ cart.total_quantity }} item{{ cart.total_quantity|pluralize }} ready for checkout</p></div></div>
+
+{% if cart.is_empty and not cart.saved_items %}
+  {% url 'products:list' as shop_url %}
+  {% include "includes/empty_state.html" with icon="cart" title="Your cart is empty" text="Browse the marketplace and add something you love." action_url=shop_url action_label="Start shopping" %}
+{% else %}
+<div class="checkout">
+  <div class="stack-lg">
+    <section class="card" aria-labelledby="cart-items-title">
+      <h2 id="cart-items-title" class="visually-hidden">Items in your cart</h2>
+      {% if cart.has_problems %}<div class="alert alert--warning"><p>Some items need your attention before you can check out.</p></div>{% endif %}
+      {% for item in cart.items %}
+        <div class="cart-line">
+          <a class="thumb thumb--lg" href="{{ item.product.get_absolute_url }}">{% if item.product.cover_image %}<img src="{{ item.product.cover_image.url }}" alt="">{% else %}<span class="placeholder-img">{% include "includes/icon.html" with name="image" %}</span>{% endif %}</a>
+          <div class="cart-line__info">
+            <h3><a href="{{ item.product.get_absolute_url }}">{{ item.product.name }}</a></h3>
+            {% if item.variant %}<p class="text-sm text-muted mb-0">{{ item.variant.label }}</p>{% endif %}
+            <p class="text-sm text-muted mb-0">Sold by {{ item.product.vendor.business_name|default:"CoreCart" }} · {{ item.unit_price|money }} each</p>
+            {% if item.problem %}<p class="stock stock--out mb-0" role="alert">{{ item.problem }}</p>
+            {% elif item.available_stock <= 5 %}<p class="stock stock--low mb-0">Only {{ item.available_stock }} left</p>
+            {% else %}<p class="stock stock--in mb-0">In stock</p>{% endif %}
+          </div>
+          <div class="price nowrap hide-mobile">{{ item.subtotal|money }}</div>
+          <div class="cart-line__controls">
+            <form method="post" action="{% url 'cart:update' item.pk %}" class="cluster">
+              {% csrf_token %}
+              <label class="visually-hidden" for="qty-{{ item.pk }}">Quantity for {{ item.product.name }}</label>
+              <div class="qty" data-qty>
+                <button type="button" data-step="-1" aria-label="Decrease quantity">&minus;</button>
+                <input id="qty-{{ item.pk }}" type="number" name="quantity" value="{{ item.quantity }}" min="1" max="{{ item.available_stock|default:1 }}" inputmode="numeric">
+                <button type="button" data-step="1" aria-label="Increase quantity">+</button>
+              </div>
+              <button class="btn btn-sm" type="submit">Update</button>
+            </form>
+            <div class="cart-line__actions">
+              <span class="price mobile-only">{{ item.subtotal|money }}</span>
+              <form method="post" action="{% url 'cart:toggle_save' item.pk %}">{% csrf_token %}<button class="link-button" type="submit">Save for later</button></form>
+              <form method="post" action="{% url 'cart:remove' item.pk %}">{% csrf_token %}<button class="link-button is-danger" type="submit">Remove</button></form>
+            </div>
+          </div>
+        </div>
+      {% empty %}
+        <p class="text-muted mb-0">No items in your cart. Items you've saved for later are below.</p>
+      {% endfor %}
+    </section>
+
+    {% if cart.saved_items %}
+    <section class="card" aria-labelledby="saved-title">
+      <h2 id="saved-title" class="card-head">Saved for later ({{ cart.saved_items|length }})</h2>
+      {% for item in cart.saved_items %}
+        <div class="cart-line">
+          <a class="thumb thumb--lg" href="{{ item.product.get_absolute_url }}">{% if item.product.cover_image %}<img src="{{ item.product.cover_image.url }}" alt="">{% else %}<span class="placeholder-img">{% include "includes/icon.html" with name="image" %}</span>{% endif %}</a>
+          <div class="cart-line__info">
+            <h3><a href="{{ item.product.get_absolute_url }}">{{ item.product.name }}</a></h3>
+            {% if item.variant %}<p class="text-sm text-muted mb-0">{{ item.variant.label }}</p>{% endif %}
+            <p class="text-sm mb-0"><span class="price">{{ item.unit_price|money }}</span> · {% if item.is_purchasable %}<span class="stock stock--in">Available</span>{% else %}<span class="stock stock--out">{{ item.problem|default:"Unavailable" }}</span>{% endif %}</p>
+          </div>
+          <div class="cart-line__controls">
+            <div class="cart-line__actions">
+              {% if item.is_purchasable %}<form method="post" action="{% url 'cart:toggle_save' item.pk %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Move to cart</button></form>{% endif %}
+              <form method="post" action="{% url 'cart:remove' item.pk %}">{% csrf_token %}<button class="link-button is-danger" type="submit">Remove</button></form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="card" aria-labelledby="summary-title">
+    <h2 id="summary-title" class="card-head">Order summary</h2>
+    <dl class="summary-list">
+      <div><dt>Items ({{ cart.total_quantity }})</dt><dd>{{ cart.subtotal|money }}</dd></div>
+      <div><dt>Delivery</dt><dd>Free</dd></div>
+      <div class="total"><dt>Subtotal</dt><dd>{{ cart.subtotal|money }}</dd></div>
+    </dl>
+    <p class="text-sm text-muted">Coupons and payment method are chosen at checkout.</p>
+    {% if cart.is_empty or cart.has_problems %}
+      <span class="btn btn-primary btn-block btn-lg is-disabled" aria-disabled="true">Proceed to checkout</span>
+      {% if cart.has_problems %}<p class="text-sm stock--out">Fix the highlighted items to continue.</p>{% endif %}
+    {% else %}
+      <a class="btn btn-primary btn-block btn-lg" href="{% url 'orders:checkout' %}">Proceed to checkout</a>
+    {% endif %}
+    <a class="btn btn-ghost btn-block" href="{% url 'products:list' %}">Continue shopping</a>
+  </aside>
+</div>
+{% endif %}
+{% endblock %}

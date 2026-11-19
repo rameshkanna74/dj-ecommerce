@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Edit review{% endblock %}
+{% block content %}
+<div class="auth-shell">
+  <div class="card">
+    <h1>Edit your review</h1>
+    <p class="text-muted">For <a href="{{ product.get_absolute_url }}">{{ product.name }}</a></p>
+    <form method="post" novalidate data-submit-once>
+      {% csrf_token %}
+      {% include "includes/form_errors.html" %}
+      {{ form.rating.as_field_group }}
+      {{ form.comment.as_field_group }}
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Save review</button>
+        <a href="{{ product.get_absolute_url }}#reviews">Cancel</a>
+      </div>
+    </form>
+    <hr>
+    <form method="post" action="{% url 'products:delete_review' review.pk %}" data-confirm="Delete your review? This cannot be undone.">
+      {% csrf_token %}<button class="btn btn-danger btn-sm" type="submit">Delete review</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

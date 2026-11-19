@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ product.name }}{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/vendor_nav.html" %}
+  <div class="card stack">
+    <h1>Delete &ldquo;{{ product.name }}&rdquo;?</h1>
+    <p>This permanently removes the product, its images and options. Products that already appear in orders are hidden instead so that invoices stay intact.</p>
+    <form method="post" class="cluster">
+      {% csrf_token %}
+      <button class="btn btn-danger" type="submit">Yes, delete product</button>
+      <a class="btn" href="{% url 'products:vendor_list' %}">Keep product</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

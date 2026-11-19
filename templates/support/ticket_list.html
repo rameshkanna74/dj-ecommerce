@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Support tickets{% endblock %}
+{% block content %}
+<div class="{% if user.is_customer or user.approved_vendor_profile %}dash{% endif %}">
+  {% include "support/_side_nav.html" %}
+  <div>
+    <div class="page-head">
+      <div><h1>Support tickets</h1><p>Questions about an order, payment or your account.</p></div>
+      <a class="btn btn-primary" href="{% url 'support:ticket_create' %}">New ticket</a>
+    </div>
+    {% if tickets %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th scope="col">#</th><th scope="col">Subject</th><th scope="col">Order</th><th scope="col">Status</th><th scope="col">Replies</th><th scope="col">Updated</th></tr></thead>
+          <tbody>
+          {% for ticket in tickets %}
+            <tr>
+              <td>{{ ticket.pk }}</td>
+              <td><a href="{{ ticket.get_absolute_url }}">{{ ticket.subject }}</a></td>
+              <td>{% if ticket.order %}<span class="mono">{{ ticket.order.order_number }}</span>{% else %}<span class="text-muted">&mdash;</span>{% endif %}</td>
+              <td><span class="badge badge--{{ ticket.status|status_tone }}">{{ ticket.get_status_display }}</span></td>
+              <td>{{ ticket.reply_count }}</td>
+              <td class="nowrap">{{ ticket.updated_at|date:"M j, Y" }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "includes/pagination.html" %}
+    {% else %}
+      {% url 'support:ticket_create' as new_url %}
+      {% include "includes/empty_state.html" with icon="chat" title="No support tickets" text="If you need help, our team is ready to assist." action_url=new_url action_label="Open a ticket" %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

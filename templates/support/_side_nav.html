@@ -1,0 +1,1 @@
+{% if user.is_customer %}{% include "includes/account_nav.html" %}{% elif user.approved_vendor_profile %}{% include "includes/vendor_nav.html" %}{% endif %}

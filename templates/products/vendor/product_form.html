@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{% if product %}Edit {{ product.name }}{% else %}Add product{% endif %}{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/vendor_nav.html" %}
+  <div>
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="{% url 'products:vendor_list' %}">Products</a></li><li aria-current="page">{% if product %}Edit{% else %}New{% endif %}</li></ol></nav>
+    <div class="page-head"><div><h1>{% if product %}Edit product{% else %}Add a product{% endif %}</h1><p>All fields are validated before your product goes live.</p></div></div>
+
+    <form method="post" enctype="multipart/form-data" novalidate data-submit-once class="stack">
+      {% csrf_token %}
+      {% include "includes/form_errors.html" %}
+      <section class="card">
+        <h2 class="text-sm eyebrow">Details</h2>
+        {{ form.name.as_field_group }}
+        {{ form.category.as_field_group }}
+        {{ form.description.as_field_group }}
+        <div class="form-grid">
+          {{ form.price.as_field_group }}
+          {{ form.stock.as_field_group }}
+        </div>
+        {{ form.is_active.as_field_group }}
+      </section>
+
+      <section class="card">
+        <h2 class="text-sm eyebrow">Images</h2>
+        {{ form.cover_image.as_field_group }}
+        <p class="text-sm text-muted">Additional gallery images (JPG, PNG, WebP or GIF, max 2&nbsp;MB each).</p>
+        {{ image_formset.management_form }}
+        {% if image_formset.non_form_errors %}<div class="form-errors">{{ image_formset.non_form_errors }}</div>{% endif %}
+        {% for image_form in image_formset %}
+          <div class="formset-row formset-row--image">
+            {% for hidden in image_form.hidden_fields %}{{ hidden }}{% endfor %}
+            {{ image_form.image.as_field_group }}
+            {{ image_form.alt_text.as_field_group }}
+            {{ image_form.position.as_field_group }}
+            {% if image_form.instance.pk %}{{ image_form.DELETE.as_field_group }}{% endif %}
+          </div>
+        {% endfor %}
+      </section>
+
+      <section class="card">
+        <h2 class="text-sm eyebrow">Options (variants)</h2>
+        <p class="text-sm text-muted">Optional. Add options such as Size or Color. Each option has its own stock and can override the price. Save to add more rows.</p>
+        {{ variant_formset.management_form }}
+        {% if variant_formset.non_form_errors %}<div class="form-errors">{{ variant_formset.non_form_errors }}</div>{% endif %}
+        {% for variant_form in variant_formset %}
+          <div class="formset-row formset-row--variant">
+            {% for hidden in variant_form.hidden_fields %}{{ hidden }}{% endfor %}
+            {% if variant_form.non_field_errors %}<div class="form-errors">{{ variant_form.non_field_errors }}</div>{% endif %}
+            {{ variant_form.attribute_name.as_field_group }}
+            {{ variant_form.attribute_value.as_field_group }}
+            {{ variant_form.price_override.as_field_group }}
+            {{ variant_form.stock.as_field_group }}
+            {{ variant_form.is_active.as_field_group }}
+            {% if variant_form.instance.pk %}{{ variant_form.DELETE.as_field_group }}{% endif %}
+          </div>
+        {% endfor %}
+      </section>
+
+      <div class="form-actions">
+        <button class="btn btn-primary btn-lg" type="submit">{% if product %}Save changes{% else %}Create product{% endif %}</button>
+        <a href="{% url 'products:vendor_list' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

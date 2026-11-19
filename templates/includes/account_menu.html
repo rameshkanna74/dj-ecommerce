@@ -1,0 +1,31 @@
+<details class="account-menu" data-menu>
+  <summary class="icon-link" aria-label="Account menu for {{ user.display_name }}">
+    {% include "includes/icon.html" with name="user" %}<span class="hide-mobile">{{ user.first_name|default:user.username|truncatechars:16 }}</span>
+  </summary>
+  <div class="menu-panel">
+    <div class="menu-label">Signed in as {{ user.username }}</div>
+    {% if user.is_customer %}
+      <a href="{% url 'accounts:customer_dashboard' %}">My account</a>
+      <a href="{% url 'orders:list' %}">Orders</a>
+      <a href="{% url 'accounts:wishlist' %}">Wishlist</a>
+      <a href="{% url 'support:ticket_list' %}">Support tickets</a>
+      <a href="{% url 'accounts:customer_profile' %}">Profile &amp; address</a>
+    {% elif user.is_vendor %}
+      <a href="{% url 'accounts:dashboard' %}">Seller dashboard</a>
+      {% if user.approved_vendor_profile %}
+        <a href="{% url 'products:vendor_list' %}">Products</a>
+        <a href="{% url 'orders:vendor_order_list' %}">Orders</a>
+        <a href="{% url 'accounts:vendor_profile' %}">Store settings</a>
+      {% endif %}
+      <a href="{% url 'support:ticket_list' %}">Support tickets</a>
+    {% endif %}
+    {% if user.is_platform_admin %}
+      <a href="{% url 'analytics:admin_dashboard' %}">Admin dashboard</a>
+      <a href="{% url 'support:staff_ticket_list' %}">Support queue</a>
+      <a href="{% url 'admin:index' %}">Django admin</a>
+    {% endif %}
+    <a href="{% url 'accounts:password_change' %}">Change password</a>
+    <hr>
+    <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+  </div>
+</details>

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Apply to sell{% endblock %}
+{% block content %}
+<div class="auth-shell auth-shell--wide">
+  <div class="card">
+    <span class="eyebrow">Seller application</span>
+    <h1>Open your CoreCart store</h1>
+    <p class="text-muted">Tell us about your business. Our team reviews every application before a store can publish products.</p>
+    <form method="post" novalidate data-submit-once>
+      {% csrf_token %}
+      {% include "includes/form_errors.html" %}
+      <h2 class="text-sm eyebrow">Your login</h2>
+      <div class="form-grid">
+        {{ form.first_name.as_field_group }}
+        {{ form.last_name.as_field_group }}
+        {{ form.username.as_field_group }}
+        {{ form.email.as_field_group }}
+        {{ form.password1.as_field_group }}
+        {{ form.password2.as_field_group }}
+        {{ form.phone.as_field_group }}
+      </div>
+      <hr>
+      <h2 class="text-sm eyebrow">Business details</h2>
+      <div class="form-grid">
+        <div class="span-2">{{ form.business_name.as_field_group }}</div>
+        <div class="span-2">{{ form.business_description.as_field_group }}</div>
+        {{ form.business_email.as_field_group }}
+        {{ form.business_phone.as_field_group }}
+        <div class="span-2">{{ form.business_address.as_field_group }}</div>
+        {{ form.business_city.as_field_group }}
+        {{ form.business_state.as_field_group }}
+        {{ form.business_zip_code.as_field_group }}
+        {{ form.business_country.as_field_group }}
+        {{ form.tax_id.as_field_group }}
+        {{ form.business_registration_number.as_field_group }}
+      </div>
+      {{ form.accept_terms.as_field_group }}
+      <div class="form-actions">
+        <button class="btn btn-primary btn-lg" type="submit">Submit application</button>
+        <a href="{% url 'accounts:login' %}">I already have an account</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

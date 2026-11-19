@@ -1,0 +1,13 @@
+{% autoescape off %}Your CoreCart seller account: {{ vendor.get_approval_status_display }}
+Hello {{ vendor.business_name }},
+
+{% if vendor.approval_status == "approved" %}Your seller application has been approved. You can now publish products and receive orders.
+
+Sign in to your seller hub: {{ base_url }}/vendor/{% elif vendor.approval_status == "rejected" %}Unfortunately your seller application was not approved.{% if vendor.rejection_reason %}
+Reason: {{ vendor.rejection_reason }}{% endif %}{% elif vendor.approval_status == "suspended" %}Your store has been suspended and your products are hidden from the marketplace.{% if vendor.rejection_reason %}
+Reason: {{ vendor.rejection_reason }}{% endif %}{% else %}Your account status is now: {{ vendor.get_approval_status_display }}.{% endif %}
+
+If you have questions, open a support ticket from your account.
+
+The {{ site_name }} team
+{% endautoescape %}

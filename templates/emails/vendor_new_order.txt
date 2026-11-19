@@ -1,0 +1,11 @@
+{% autoescape off %}{% load core_tags %}New order {{ order.order_number }} for {{ vendor.business_name }}
+Hello {{ vendor.business_name }},
+
+You have a new order containing the following items:
+
+{% for item in items %}- {{ item.quantity }} x {{ item.display_name }}{% if item.variant_label %} ({{ item.variant_label }}){% endif %}: {{ item.subtotal|money }}
+{% endfor %}
+Manage fulfilment: {{ url }}
+
+The {{ site_name }} team
+{% endautoescape %}

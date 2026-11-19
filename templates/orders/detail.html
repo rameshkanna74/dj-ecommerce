@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Order {{ order.order_number }}{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/account_nav.html" %}
+  <div class="stack-lg">
+    <div class="page-head">
+      <div>
+        <h1>Order <span class="mono">{{ order.order_number }}</span></h1>
+        <p>Placed {{ order.created_at|date:"F j, Y, g:i a" }}</p>
+      </div>
+      <div class="cluster">
+        <span class="badge badge--{{ order.status|status_tone }}">{{ order.get_status_display }}</span>
+        <span class="badge badge--{{ order.payment_status|status_tone }}">{{ order.get_payment_status_display }}</span>
+      </div>
+    </div>
+
+    <section class="card" aria-label="Order progress">
+      {% if order.is_cancelled %}
+        <div class="alert alert--error"><p class="mb-0">This order was cancelled{% if order.cancelled_at %} on {{ order.cancelled_at|date:"M j, Y" }}{% endif %}.</p></div>
+      {% else %}
+        <ol class="steps">
+          {% for step in order.PROGRESS_STEPS %}
+            <li class="{% if forloop.counter0 < order.progress_index %}is-done{% elif forloop.counter0 == order.progress_index %}{% if order.status == 'delivered' %}is-done{% else %}is-current{% endif %}{% endif %}">{{ step.label }}</li>
+          {% endfor %}
+        </ol>
+      {% endif %}
+    </section>
+
+    <div class="grid-2">
+      <section class="card">
+        <h2 class="text-sm eyebrow">Delivery address</h2>
+        <address>
+          <strong>{{ order.shipping_full_name }}</strong><br>
+          {% for line in order.shipping_lines %}{{ line }}<br>{% endfor %}
+          {% if order.shipping_phone %}{{ order.shipping_phone }}{% endif %}
+        </address>
+        {% if order.customer_note %}<p class="text-sm text-muted">Note: {{ order.customer_note }}</p>{% endif %}
+      </section>
+      <section class="card">
+        <h2 class="text-sm eyebrow">Payment</h2>
+        <dl class="dl-grid">
+          <dt>Method</dt><dd>{{ order.get_payment_method_display }}</dd>
+          <dt>Status</dt><dd>{{ order.get_payment_status_display }}{% if order.paid_at %} · {{ order.paid_at|date:"M j, Y" }}{% endif %}</dd>
+        </dl>
+        {% if not order.is_paid and not order.is_cancelled and payment_instructions %}<p class="text-sm text-muted">{{ payment_instructions }}</p>{% endif %}
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-head"><h2>Items</h2><a class="btn btn-sm" href="{% url 'orders:invoice' order.order_number %}">View invoice</a></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th scope="col">Product</th><th scope="col">Seller</th><th scope="col">Status</th><th scope="col" class="num">Price</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Total</th></tr></thead>
+          <tbody>
+          {% for item in order.items.all %}
+            <tr>
+              <td><strong>{% if item.product.is_active %}<a href="{{ item.product.get_absolute_url }}">{{ item.display_name }}</a>{% else %}{{ item.display_name }}{% endif %}</strong>{% if item.variant_label %}<br><small class="text-muted">{{ item.variant_label }}</small>{% endif %}
+                {% if item.tracking_number %}<br><small>Tracking: <span class="mono">{{ item.tracking_number }}</span></small>{% endif %}</td>
+              <td>{{ item.vendor.business_name|default:"CoreCart" }}</td>
+              <td><span class="badge badge--{{ item.status|status_tone }}">{{ item.get_status_display }}</span></td>
+              <td class="num">{{ item.price|money }}</td>
+              <td class="num">{{ item.quantity }}</td>
+              <td class="num">{{ item.subtotal|money }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <dl class="summary-list summary-list--end">
+        <div><dt>Subtotal</dt><dd>{{ order.subtotal_amount|money }}</dd></div>
+        {% if order.discount_amount %}<div class="discount"><dt>Discount{% if order.coupon_code %} ({{ order.coupon_code }}){% endif %}</dt><dd>&minus;{{ order.discount_amount|money }}</dd></div>{% endif %}
+        <div class="total"><dt>Total</dt><dd>{{ order.total_amount|money }}</dd></div>
+      </dl>
+    </section>
+
+    <div class="grid-2">
+      <section class="card">
+        <h2 class="text-sm eyebrow">Order timeline</h2>
+        <ol class="timeline">
+          {% for event in order.timeline.all %}
+            <li><time datetime="{{ event.timestamp|date:'c' }}">{{ event.timestamp|date:"M j, Y g:i a" }}</time><p>{{ event.note|default:event.get_status_display }}</p></li>
+          {% endfor %}
+        </ol>
+      </section>
+      <section class="card stack">
+        <h2 class="text-sm eyebrow">Need help with this order?</h2>
+        <a class="btn" href="{% url 'support:ticket_create' %}?order={{ order.order_number }}">Contact support</a>
+        {% if can_cancel %}
+          <form method="post" action="{% url 'orders:cancel' order.order_number %}" data-confirm="Cancel this order? Items will be released back to stock." novalidate>
+            {% csrf_token %}
+            {{ cancel_form.reason.as_field_group }}
+            <button class="btn btn-danger" type="submit">Cancel order</button>
+          </form>
+        {% elif not order.is_cancelled %}
+          <p class="text-sm text-muted mb-0">Orders can be cancelled online until a seller starts processing them.</p>
+        {% endif %}
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

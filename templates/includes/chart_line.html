@@ -1,0 +1,15 @@
+{% load core_tags %}{% if has_data %}
+<figure class="chart-figure">
+  <svg class="chart" viewBox="0 0 {{ width }} {{ height }}" role="img" aria-label="{{ title }}: line chart, total {{ total|money }}">
+    <title>{{ title }}</title>
+    <line class="grid-line" x1="0" x2="{{ width }}" y1="{{ baseline }}" y2="{{ baseline }}"/>
+    <polygon class="area" points="{{ area }}"/>
+    <polyline class="line" points="{{ polyline }}"/>
+    {% for p in points %}<circle class="dot" cx="{{ p.x }}" cy="{{ p.y }}" r="3"><title>{{ p.label }}: {{ p.value|money }}</title></circle>{% endfor %}
+    {% for p in axis_labels %}<text class="axis-label" x="{{ p.x }}" y="{{ label_y }}" text-anchor="middle">{{ p.label }}</text>{% endfor %}
+  </svg>
+  <figcaption class="text-sm text-muted">Peak day {{ max_value|money }} · Period total {{ total|money }}</figcaption>
+</figure>
+{% else %}
+<p class="text-muted">No sales recorded in this period yet.</p>
+{% endif %}

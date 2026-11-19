@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{% if query %}Search: {{ query }}{% elif current_category %}{{ current_category.name }}{% else %}All products{% endif %}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol><li><a href="{% url 'core:home' %}">Home</a></li><li>{% if current_category %}<a href="{% url 'products:list' %}">Products</a></li><li aria-current="page">{{ current_category.name }}{% else %}<span aria-current="page">Products</span>{% endif %}</li></ol>
+</nav>
+
+<div class="page-head">
+  <div>
+    <h1>{% if query %}Results for &ldquo;{{ query }}&rdquo;{% elif current_category %}{{ current_category.name }}{% else %}All products{% endif %}</h1>
+    <p>{% if current_category.description %}{{ current_category.description }}{% else %}{{ paginator.count|default:0 }} product{{ paginator.count|pluralize }} available{% endif %}</p>
+  </div>
+</div>
+
+<div class="catalog">
+  <details class="filters" open{% if current_category or filters.min_price is not None or filters.max_price is not None or filters.in_stock %} data-active{% endif %}>
+    <summary><h2 class="mb-0">Filters</h2><span class="chev mobile-only" aria-hidden="true">&#9662;</span></summary>
+    <form method="get" class="stack" id="filter-form">
+      {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+      {% if current_sort != "newest" %}<input type="hidden" name="sort" value="{{ current_sort }}">{% endif %}
+      <div class="filter-group">
+        <h3>Category</h3>
+        <ul class="filter-links">
+          <li><a href="{% query_string category=None page=None %}" class="{% if not current_category %}is-active{% endif %}">All categories</a></li>
+          {% for category in categories %}
+            <li><a href="{% query_string category=category.slug page=None %}" class="{% if current_category.pk == category.pk %}is-active{% endif %}">{{ category.name }}</a></li>
+          {% endfor %}
+        </ul>
+        {% if current_category %}<input type="hidden" name="category" value="{{ current_category.slug }}">{% endif %}
+      </div>
+      <div class="filter-group">
+        <h3>Price</h3>
+        <div class="price-range">
+          {{ filter_form.min_price.as_field_group }}
+          {{ filter_form.max_price.as_field_group }}
+        </div>
+        {{ filter_form.in_stock.as_field_group }}
+        <div class="cluster">
+          <button class="btn btn-primary btn-sm" type="submit">Apply filters</button>
+          <a class="btn btn-ghost btn-sm" href="{% url 'products:list' %}{% if query %}?q={{ query|urlencode }}{% endif %}">Reset</a>
+        </div>
+      </div>
+    </form>
+  </details>
+
+  <div>
+    <div class="toolbar">
+      <div class="chips" aria-label="Active filters">
+        {% if query %}<a class="chip is-active" href="{% query_string q=None page=None %}">&ldquo;{{ query }}&rdquo; &times;<span class="visually-hidden"> remove search</span></a>{% endif %}
+        {% if current_category %}<a class="chip is-active" href="{% query_string category=None page=None %}">{{ current_category.name }} &times;<span class="visually-hidden"> remove category</span></a>{% endif %}
+        {% if filters.min_price is not None %}<a class="chip is-active" href="{% query_string min_price=None page=None %}">From {{ filters.min_price|money }} &times;</a>{% endif %}
+        {% if filters.max_price is not None %}<a class="chip is-active" href="{% query_string max_price=None page=None %}">Up to {{ filters.max_price|money }} &times;</a>{% endif %}
+        {% if filters.in_stock %}<a class="chip is-active" href="{% query_string in_stock=None page=None %}">In stock &times;</a>{% endif %}
+      </div>
+      <form method="get" class="cluster">
+        {% for key, value in request.GET.items %}{% if key != "sort" and key != "page" %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+        <label for="sort">Sort by</label>
+        <select id="sort" name="sort" data-autosubmit>
+          {% for value, label in sort_choices %}<option value="{{ value }}" {% if value == current_sort %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <noscript><button class="btn btn-sm" type="submit">Sort</button></noscript>
+      </form>
+    </div>
+
+    {% if filter_form.errors %}<div class="form-errors" role="alert">{% for field, errors in filter_form.errors.items %}{{ errors.0 }} {% endfor %}</div>{% endif %}
+
+    {% if products %}
+      <div class="product-grid product-grid--3">
+        {% for product in products %}{% include "includes/product_card.html" with show_cart_button=True %}{% endfor %}
+      </div>
+      {% include "includes/pagination.html" %}
+    {% else %}
+      {% url 'products:list' as all_url %}
+      {% include "includes/empty_state.html" with icon="search" title="No products match your search" text="Try a different keyword, widen the price range or browse all categories." action_url=all_url action_label="Clear all filters" %}
+    {% endif %}
+  </div>
+</div>
+
+{% if recently_viewed %}
+<section class="section" aria-labelledby="recent-title">
+  <div class="section-head"><h2 id="recent-title">Recently viewed</h2></div>
+  <div class="product-grid">{% for product in recently_viewed|slice:":4" %}{% include "includes/product_card.html" %}{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}

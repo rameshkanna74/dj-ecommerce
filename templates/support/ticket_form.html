@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}New support ticket{% endblock %}
+{% block content %}
+<div class="{% if user.is_customer or user.approved_vendor_profile %}dash{% endif %}">
+  {% include "support/_side_nav.html" %}
+  <div>
+    <div class="page-head"><div><h1>Open a support ticket</h1><p>We usually reply within one business day.</p></div></div>
+    <form class="card" method="post" novalidate data-submit-once>
+      {% csrf_token %}
+      {% include "includes/form_errors.html" %}
+      {{ form.subject.as_field_group }}
+      {{ form.order.as_field_group }}
+      {{ form.message.as_field_group }}
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Submit ticket</button>
+        <a href="{% url 'support:ticket_list' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

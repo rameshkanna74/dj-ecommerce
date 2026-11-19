@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Seller application{% endblock %}
+{% block content %}
+<div class="auth-shell auth-shell--wide">
+  <div class="card stack">
+    <span class="eyebrow">Seller application</span>
+    <h1>{{ vendor_profile.business_name }}</h1>
+    {% if vendor_profile.approval_status == "pending" %}
+      <div class="alert alert--warning"><p>Your application is <strong>pending review</strong>. You'll receive an email as soon as our team has reviewed it. Products can be published once your store is approved.</p></div>
+    {% elif vendor_profile.approval_status == "rejected" %}
+      <div class="alert alert--error"><p>Unfortunately your application was <strong>not approved</strong>.{% if vendor_profile.rejection_reason %} Reason: {{ vendor_profile.rejection_reason }}{% endif %}</p></div>
+    {% elif vendor_profile.approval_status == "suspended" %}
+      <div class="alert alert--error"><p>Your store is <strong>suspended</strong> and its products are hidden.{% if vendor_profile.rejection_reason %} Reason: {{ vendor_profile.rejection_reason }}{% endif %}</p></div>
+    {% elif not user.is_active %}
+      <div class="alert alert--error"><p>Your account is inactive.</p></div>
+    {% endif %}
+    <dl class="dl-grid">
+      <dt>Status</dt><dd>{{ vendor_profile.get_approval_status_display }}</dd>
+      <dt>Submitted</dt><dd>{{ vendor_profile.created_at|date:"M j, Y" }}</dd>
+      <dt>Business email</dt><dd>{{ vendor_profile.business_email }}</dd>
+      <dt>Store address</dt><dd>{{ vendor_profile.business_city }}, {{ vendor_profile.business_country }}</dd>
+    </dl>
+    <div class="cluster">
+      <a class="btn" href="{% url 'support:ticket_create' %}">Contact support</a>
+      <a class="btn btn-ghost" href="{% url 'core:home' %}">Browse the marketplace</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

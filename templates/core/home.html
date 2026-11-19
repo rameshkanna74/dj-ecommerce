@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Independent goods, thoughtfully curated{% endblock %}
+
+{% block content %}
+<section class="hero" aria-labelledby="hero-title">
+  <span class="eyebrow">The CoreCart marketplace</span>
+  <h1 id="hero-title">Well-made goods from independent sellers.</h1>
+  <p>Discover products from approved makers and small businesses. Transparent prices, real reviews and secure checkout with cash on delivery.</p>
+  <div class="cluster">
+    <a class="btn btn-primary btn-lg" href="{% url 'products:list' %}">Shop the collection</a>
+    {% if not user.is_authenticated %}<a class="btn btn-ghost btn-lg" href="{% url 'accounts:vendor_register' %}">Sell on CoreCart</a>{% endif %}
+  </div>
+  <dl class="hero-stats">
+    <div><dt>Payment</dt><dd>Pay on delivery</dd></div>
+    <div><dt>Sellers</dt><dd>Reviewed &amp; approved</dd></div>
+    <div><dt>Reviews</dt><dd>From real customers</dd></div>
+  </dl>
+</section>
+
+{% if featured_categories %}
+<section class="section" aria-labelledby="categories-title">
+  <div class="section-head">
+    <div><h2 id="categories-title">Shop by category</h2><p>Browse our most-stocked departments.</p></div>
+    <a class="btn btn-ghost" href="{% url 'products:list' %}">All products &rarr;</a>
+  </div>
+  <div class="category-grid">
+    {% for category in featured_categories %}
+      <a class="category-tile" href="{{ category.get_absolute_url }}">
+        <h3>{{ category.name }}</h3>
+        <span>{{ category.product_count }} product{{ category.product_count|pluralize }} &rarr;</span>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="section" aria-labelledby="featured-title">
+  <div class="section-head">
+    <div><h2 id="featured-title">Featured products</h2><p>Hand-picked favourites from our sellers.</p></div>
+  </div>
+  {% if featured_products %}
+    <div class="product-grid">
+      {% for product in featured_products %}{% include "includes/product_card.html" with show_cart_button=True %}{% endfor %}
+    </div>
+  {% else %}
+    {% include "includes/empty_state.html" with title="The shelves are being stocked" text="Our sellers are preparing their first products. Please check back soon." %}
+  {% endif %}
+</section>
+
+{% if best_sellers %}
+<section class="section" aria-labelledby="best-title">
+  <div class="section-head">
+    <div><h2 id="best-title">Best sellers</h2><p>Ranked by units sold.</p></div>
+    <a class="btn btn-ghost" href="{% url 'products:list' %}?sort=popular">See more &rarr;</a>
+  </div>
+  <div class="product-grid">
+    {% for product in best_sellers %}{% include "includes/product_card.html" with show_cart_button=True %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="section promo" aria-label="Promotions">
+  <div class="promo-card">
+    <span class="eyebrow">For shoppers</span>
+    <h3>Pay when it arrives.</h3>
+    <p>Choose cash on delivery at checkout. You are only charged when your order reaches you.</p>
+    <a class="btn btn-primary" href="{% url 'products:list' %}">Start shopping</a>
+  </div>
+  <div class="promo-card promo-card--accent">
+    <span class="eyebrow">For businesses</span>
+    <h3>Open your storefront.</h3>
+    <p>Apply as a seller, get approved and reach customers with your own branded store page and sales dashboard.</p>
+    <a class="btn btn-accent" href="{% url 'accounts:vendor_register' %}">Apply to sell</a>
+  </div>
+</section>
+
+{% if new_arrivals %}
+<section class="section" aria-labelledby="new-title">
+  <div class="section-head">
+    <div><h2 id="new-title">New arrivals</h2><p>The latest additions to the marketplace.</p></div>
+    <a class="btn btn-ghost" href="{% url 'products:list' %}?sort=newest">View all &rarr;</a>
+  </div>
+  <div class="product-grid">
+    {% for product in new_arrivals %}{% include "includes/product_card.html" with show_cart_button=True %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if recently_viewed %}
+<section class="section" aria-labelledby="recent-title">
+  <div class="section-head"><h2 id="recent-title">Recently viewed</h2></div>
+  <div class="product-grid">
+    {% for product in recently_viewed %}{% include "includes/product_card.html" %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="section card value-props" aria-label="Why CoreCart">
+  <div>{% include "includes/icon.html" with name="shield" %}<div><h3>Approved sellers</h3><p>Every vendor is reviewed by our team before they can sell.</p></div></div>
+  <div>{% include "includes/icon.html" with name="truck" %}<div><h3>Tracked delivery</h3><p>Follow each item from processing to your door.</p></div></div>
+  <div>{% include "includes/icon.html" with name="chat" %}<div><h3>Real support</h3><p>Open a ticket any time and our team will respond.</p></div></div>
+</section>
+{% endblock %}

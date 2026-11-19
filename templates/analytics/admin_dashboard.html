@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load core_tags chart_tags %}
+{% block title %}Admin dashboard{% endblock %}
+{% block content %}
+<div class="dash">
+  {% include "includes/staff_nav.html" %}
+  <div class="stack-lg">
+    <div class="page-head">
+      <div><h1>Marketplace overview</h1><p>Revenue counts paid, non-cancelled orders only.</p></div>
+      <div class="cluster">
+        <a class="chip {% if days == 7 %}is-active{% endif %}" href="?days=7">7 days</a>
+        <a class="chip {% if days == 30 %}is-active{% endif %}" href="?days=30">30 days</a>
+        <a class="chip {% if days == 90 %}is-active{% endif %}" href="?days=90">90 days</a>
+      </div>
+    </div>
+
+    <dl class="kpis">
+      <div class="kpi kpi--accent"><dt>Revenue</dt><dd>{{ kpis.revenue|money }}</dd><small>{{ kpis.paid_orders }} paid order{{ kpis.paid_orders|pluralize }} · avg {{ kpis.avg_order_value|money }}</small></div>
+      <div class="kpi"><dt>Orders</dt><dd>{{ kpis.orders }}</dd><small>{{ kpis.pending_orders }} pending · {{ kpis.awaiting_payment }} awaiting payment</small></div>
+      <div class="kpi"><dt>Customers</dt><dd>{{ kpis.customers }}</dd></div>
+      <div class="kpi"><dt>Vendors</dt><dd>{{ kpis.vendors }}</dd><small>{{ kpis.pending_vendors }} awaiting approval</small></div>
+      <div class="kpi"><dt>Products</dt><dd>{{ kpis.products }}</dd><small>{{ kpis.active_products }} active · {{ kpis.out_of_stock }} out of stock</small></div>
+      <div class="kpi"><dt>Categories</dt><dd>{{ category_count }}</dd></div>
+      <div class="kpi"><dt>Pending vendors</dt><dd>{{ kpis.pending_vendors }}</dd><small><a href="{% url 'admin:accounts_vendorprofile_changelist' %}?approval_status__exact=pending">Review applications</a></small></div>
+      <div class="kpi"><dt>Reports</dt><dd class="text-sm"><a href="{% url 'analytics:export_orders' %}">Orders CSV</a><br><a href="{% url 'analytics:export_products' %}">Products CSV</a></dd></div>
+    </dl>
+
+    <section class="card">
+      <div class="card-head"><h2>Recognised revenue, last {{ days }} days</h2></div>
+      {% line_chart sales_trend "Daily recognised revenue" %}
+    </section>
+
+    <div class="grid-2">
+      <section class="card">
+        <div class="card-head"><h2>Category performance</h2><span class="text-sm text-muted">Paid orders, item value</span></div>
+        {% bar_chart category_performance "Revenue by category" %}
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Top-selling products</h2></div>
+        {% if top_products %}
+        <ol class="hbars">
+          {% for p in top_products %}<li class="split text-sm"><span>{{ p.product_name }}</span><strong>{{ p.units }} sold · {{ p.revenue|money }}</strong></li>{% endfor %}
+        </ol>
+        {% else %}<p class="text-muted">No sales yet.</p>{% endif %}
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-head"><h2>Recent orders</h2><a href="{% url 'admin:orders_order_changelist' %}">Manage orders</a></div>
+      {% if recent_orders %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th scope="col">Order</th><th scope="col">Customer</th><th scope="col">Date</th><th scope="col">Status</th><th scope="col">Payment</th><th scope="col" class="num">Total</th></tr></thead>
+          <tbody>
+          {% for order in recent_orders %}
+            <tr>
+              <td><a class="mono" href="{% url 'admin:orders_order_change' order.pk %}">{{ order.order_number }}</a></td>
+              <td>{{ order.customer_name }}</td>
+              <td class="nowrap">{{ order.created_at|date:"M j, g:i a" }}</td>
+              <td><span class="badge badge--{{ order.status|status_tone }}">{{ order.get_status_display }}</span></td>
+              <td><span class="badge badge--{{ order.payment_status|status_tone }}">{{ order.get_payment_status_display }}</span></td>
+              <td class="num">{{ order.total_amount|money }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<p class="text-muted">No orders yet.</p>{% endif %}
+    </section>
+
+    <div class="grid-2">
+      <section class="card">
+        <div class="card-head"><h2>Vendor applications</h2></div>
+        {% for vendor in pending_vendor_list %}
+          <div class="split text-sm order-line"><span><strong>{{ vendor.business_name }}</strong><br><span class="text-muted">{{ vendor.user.email }} · {{ vendor.created_at|date:"M j" }}</span></span><a class="btn btn-sm" href="{% url 'admin:accounts_vendorprofile_change' vendor.pk %}">Review</a></div>
+        {% empty %}<p class="text-muted mb-0">No pending applications.</p>{% endfor %}
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Stock monitoring</h2><span class="text-sm text-muted">5 units or fewer</span></div>
+        {% for product in low_stock_products %}
+          <div class="split text-sm order-line"><span>{{ product.name }}<br><span class="text-muted">{{ product.vendor.business_name|default:"CoreCart" }}</span></span><span class="badge badge--{% if product.stock == 0 %}danger{% else %}warning{% endif %}">{{ product.stock }} left</span></div>
+        {% empty %}<p class="text-muted mb-0">All active products are well stocked.</p>{% endfor %}
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}
