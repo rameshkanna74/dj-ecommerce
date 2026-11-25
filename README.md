@@ -329,7 +329,8 @@ aws ssm get-parameter --with-decryption --name /corecart/demo-password  --query 
 
 Email uses the console backend (messages go to the app log). To send real mail, add SMTP settings such as
 `EMAIL_BACKEND`, `EMAIL_HOST` and `EMAIL_HOST_USER` (Amazon SES SMTP works) to the `/corecart/env` parameter,
-then run `deploy.py config`.
+then run `deploy.py config`. While the console backend is active, the deploy sets
+`DJANGO_SILENCED_SYSTEM_CHECKS=mail.E001`; it drops that automatically once an SMTP backend is configured.
 
 ### Using your own domain
 The demo runs on `https://dxxxx.cloudfront.net`. To move it to your own domain (e.g. `shop.example.com`):

@@ -427,6 +427,12 @@ class Deployer:
             "GUNICORN_BIND": "127.0.0.1:8000", "GUNICORN_WORKERS": "2", "GUNICORN_THREADS": "4",
             "EMAIL_BACKEND": existing.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"),
         }
+        # Demo default: no outgoing email (messages go to the app log). Django 6.1's deploy check rejects the
+        # console backend, so silence exactly that check, and only while the console backend is in use.
+        if env["EMAIL_BACKEND"].endswith("console.EmailBackend"):
+            env["DJANGO_SILENCED_SYSTEM_CHECKS"] = "mail.E001"
+        else:
+            existing.pop("DJANGO_SILENCED_SYSTEM_CHECKS", None)
         # Keep anything added by hand (SMTP settings, etc.) that we don't manage.
         for k, v in existing.items():
             env.setdefault(k, v)
@@ -546,7 +552,7 @@ def cmd_seed(d: Deployer, a) -> None:
         d.put_param("admin-password", pw)
     out = d.run(inst["InstanceId"], f"""set -euo pipefail
 export PATH=/usr/local/bin:$PATH
-corecart-manage seed_demo
+corecart-manage seed_demo --force  # explicit demo opt-in; random passwords
 export DJANGO_SUPERUSER_PASSWORD="$(aws ssm get-parameter --region {d.region} --with-decryption --name {PARAM}/admin-password --query Parameter.Value --output text)"
 corecart-manage createsuperuser --noinput --username admin --email admin@example.com 2>/dev/null \\
   && echo "admin user created" || echo "admin user already exists (password unchanged)"

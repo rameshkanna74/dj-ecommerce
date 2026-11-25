@@ -291,6 +291,10 @@ if _EMAIL_BACKEND.endswith("smtp.EmailBackend"):
         "timeout": int(env("EMAIL_TIMEOUT", "10")),
     }
 MAILERS = {"default": {"BACKEND": _EMAIL_BACKEND, "OPTIONS": _EMAIL_OPTIONS}}
+
+# System checks to silence, comma separated. Only for deliberate trade-offs, e.g. a demo deployment with
+# no outgoing email sets DJANGO_SILENCED_SYSTEM_CHECKS=mail.E001 (console email backend).
+SILENCED_SYSTEM_CHECKS = env_list("DJANGO_SILENCED_SYSTEM_CHECKS")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "CoreCart <noreply@corecart.local>")
 SERVER_EMAIL = env("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 
