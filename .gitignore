@@ -51,6 +51,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!frontend/src/lib/
 lib64/
 parts/
 sdist/
@@ -255,3 +256,9 @@ __marimo__/
 media/
 staticfiles/
 
+
+# Local cloud credentials / deploy state — never commit
+aws.md
+*.credentials
+deploy/aws/.state.json
+.claude/settings.local.json

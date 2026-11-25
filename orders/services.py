@@ -96,19 +96,39 @@ def _record(order, status, note, actor=None):
     OrderTimeline.objects.create(order=order, status=status, note=note, actor=actor)
 
 
-@transaction.atomic
+class _DuplicateCheckout(Exception):
+    """Internal: the order INSERT hit the unique ``checkout_token`` (a concurrent retry won)."""
+
+
 def place_order(user, *, shipping, payment_method, coupon_code="", checkout_token, customer_note=""):
     """
     Turn the user's active cart into an order. Returns ``(order, created)``.
 
     A repeated submission with the same ``checkout_token`` returns the existing
-    order instead of creating a second one.
+    order instead of creating a second one. When two submissions race, the loser's
+    whole transaction (including its coupon claim) is rolled back before the
+    winner's order is returned.
     """
     existing = Order.objects.filter(checkout_token=checkout_token, user=user).first()
     if existing:
         return existing, False
+    try:
+        return _place_order(user, shipping=shipping, payment_method=payment_method, coupon_code=coupon_code,
+                            checkout_token=checkout_token, customer_note=customer_note)
+    except _DuplicateCheckout as duplicate:
+        existing = Order.objects.filter(checkout_token=checkout_token, user=user).first()
+        if existing:
+            return existing, False
+        if Order.objects.filter(checkout_token=checkout_token).exists():
+            raise CheckoutError("This checkout key was already used. Please try again.") from None
+        raise duplicate.__cause__ from None
 
-    if payment_method not in {choice for choice, _ in Order.PaymentMethod.choices}:
+
+@transaction.atomic
+def _place_order(user, *, shipping, payment_method, coupon_code, checkout_token, customer_note):
+    from .payments import available_payment_methods
+
+    if payment_method not in dict(available_payment_methods()):
         raise CheckoutError("Please choose a valid payment method.")
 
     items = _active_cart_items(user)
@@ -116,6 +136,8 @@ def place_order(user, *, shipping, payment_method, coupon_code="", checkout_toke
         raise CheckoutError("Your cart is empty.")
 
     # Lock the product and variant rows involved so prices/stock cannot change underneath us.
+    # Always lock in primary-key order (products, then variants, then the coupon) so two
+    # concurrent checkouts with overlapping carts cannot deadlock each other.
     product_ids = {item.product_id for item in items}
     variant_ids = {item.variant_id for item in items if item.variant_id}
     locked_products = {
@@ -123,8 +145,14 @@ def place_order(user, *, shipping, payment_method, coupon_code="", checkout_toke
         for p in Product.objects.select_for_update(of=("self",))
         .filter(pk__in=product_ids)
         .select_related("category", "vendor__user")
+        .order_by("pk")
     }
-    locked_variants = {v.pk: v for v in ProductVariant.objects.select_for_update().filter(pk__in=variant_ids)}
+    locked_variants = {
+        v.pk: v for v in ProductVariant.objects.select_for_update().filter(pk__in=variant_ids).order_by("pk")
+    }
+    products_with_variants = set(
+        ProductVariant.objects.filter(product_id__in=product_ids, is_active=True).values_list("product_id", flat=True)
+    )
 
     lines = []
     subtotal = Decimal("0.00")
@@ -133,7 +161,7 @@ def place_order(user, *, shipping, payment_method, coupon_code="", checkout_toke
         variant = locked_variants.get(item.variant_id) if item.variant_id else None
         if not product.is_visible or (variant is not None and not variant.is_active):
             raise CheckoutError(f'"{product.name}" is no longer available. Please remove it from your cart.')
-        if variant is None and product.variants.filter(is_active=True).exists():
+        if variant is None and product.pk in products_with_variants:
             raise CheckoutError(f'Please choose an option for "{product.name}".')
         available = variant.stock if variant else product.stock
         if item.quantity > available:
@@ -165,7 +193,7 @@ def place_order(user, *, shipping, payment_method, coupon_code="", checkout_toke
             raise CheckoutError("This coupon has reached its usage limit.")
 
     try:
-        with transaction.atomic():
+        with transaction.atomic():  # savepoint so the IntegrityError is cleanly catchable
             order = Order.objects.create(
                 user=user,
                 status=Order.Status.PENDING,
@@ -180,12 +208,10 @@ def place_order(user, *, shipping, payment_method, coupon_code="", checkout_toke
                 customer_note=customer_note,
                 **{f"shipping_{key}": value for key, value in shipping.items()},
             )
-    except IntegrityError:
-        # Another request with the same token won the race.
-        existing = Order.objects.filter(checkout_token=checkout_token, user=user).first()
-        if existing:
-            return existing, False
-        raise
+    except IntegrityError as exc:
+        # Most likely another request with the same token won the race. Leave this atomic
+        # block so everything above (notably the coupon claim) is rolled back.
+        raise _DuplicateCheckout from exc
 
     order_items = []
     for item, product, variant, unit_price in lines:
@@ -222,13 +248,19 @@ def place_order(user, *, shipping, payment_method, coupon_code="", checkout_toke
     return order, True
 
 
-def _restock(item):
-    if item.variant_id:
-        ProductVariant.objects.filter(pk=item.variant_id).update(stock=F("stock") + item.quantity)
-    else:
+def _restock(items):
+    """
+    Return the stock of ``items`` to inventory. Rows are updated in the same order checkout
+    locks them (products by pk, then variants by pk) to avoid deadlocks with it.
+    """
+    product_lines = sorted((i for i in items if not i.variant_id), key=lambda i: i.product_id)
+    variant_lines = sorted((i for i in items if i.variant_id), key=lambda i: i.variant_id)
+    for item in product_lines:
         Product.objects.filter(pk=item.product_id).update(stock=F("stock") + item.quantity)
-    product_id = item.product_id
-    transaction.on_commit(lambda: notify_back_in_stock(product_id))
+    for item in variant_lines:
+        ProductVariant.objects.filter(pk=item.variant_id).update(stock=F("stock") + item.quantity)
+    for product_id in sorted({item.product_id for item in items}):
+        transaction.on_commit(lambda product_id=product_id: notify_back_in_stock(product_id))
 
 
 def recalculate_totals(order):
@@ -282,8 +314,9 @@ def _release_coupon(order):
 @transaction.atomic
 def set_item_status(item, new_status, actor, tracking_number=None):
     """Move one order line through the fulfilment workflow."""
-    item = OrderItem.objects.select_for_update().get(pk=item.pk)
+    # Lock order before item: the same order as cancel_order, so the two cannot deadlock.
     order = Order.objects.select_for_update().get(pk=item.order_id)
+    item = OrderItem.objects.select_for_update().get(pk=item.pk)
 
     if not item.can_transition_to(new_status):
         raise OrderWorkflowError(
@@ -307,7 +340,7 @@ def set_item_status(item, new_status, actor, tracking_number=None):
     _record(order, order.status, note, actor)
 
     if new_status == OrderItem.Status.CANCELLED:
-        _restock(item)
+        _restock([item])
         recalculate_totals(order)
     if tracking_number and not order.tracking_number:
         order.tracking_number = tracking_number
@@ -320,22 +353,29 @@ def set_item_status(item, new_status, actor, tracking_number=None):
 
 
 @transaction.atomic
-def cancel_order(order, actor, reason=""):
-    """Cancel every remaining line, restock it and release the coupon."""
+def cancel_order(order, actor, reason="", *, by_customer=False):
+    """
+    Cancel every remaining line, restock it and release the coupon.
+
+    ``by_customer`` applies the stricter customer rule (``Order.can_customer_cancel``)
+    while the order is locked, so it cannot race with a vendor starting fulfilment.
+    """
     order = Order.objects.select_for_update().get(pk=order.pk)
     if order.is_cancelled:
         raise OrderWorkflowError("This order is already cancelled.")
     if order.is_paid:
         raise OrderWorkflowError("Paid orders must be refunded before they can be cancelled.")
     items = list(order.items.select_for_update())
+    if by_customer and not order.can_customer_cancel():
+        raise OrderWorkflowError("This order can no longer be cancelled.")
     if any(i.status in (OrderItem.Status.SHIPPED, OrderItem.Status.DELIVERED) for i in items):
         raise OrderWorkflowError("Orders with shipped items can no longer be cancelled.")
 
-    for item in items:
-        if item.status != OrderItem.Status.CANCELLED:
-            item.status = OrderItem.Status.CANCELLED
-            item.save(update_fields=["status", "updated_at"])
-            _restock(item)
+    to_cancel = [item for item in items if item.status != OrderItem.Status.CANCELLED]
+    for item in to_cancel:
+        item.status = OrderItem.Status.CANCELLED
+        item.save(update_fields=["status", "updated_at"])
+    _restock(to_cancel)
 
     order.status = Order.Status.CANCELLED
     order.cancelled_at = timezone.now()

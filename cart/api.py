@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_field
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,6 +10,11 @@ from products.models import Product, ProductVariant
 
 from . import services
 from .models import CartItem
+
+
+class CartVariantSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    label = serializers.CharField()
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -25,7 +30,8 @@ class CartItemSerializer(serializers.ModelSerializer):
         fields = ["id", "product", "variant", "quantity", "is_saved_for_later", "unit_price", "subtotal",
                   "available_stock", "problem", "created_at", "updated_at"]
 
-    def get_variant(self, obj) -> dict | None:
+    @extend_schema_field(CartVariantSerializer(allow_null=True))
+    def get_variant(self, obj):
         if not obj.variant_id:
             return None
         return {"id": obj.variant_id, "label": obj.variant.label}

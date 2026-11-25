@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.api.permissions import IsPlatformAdmin, VendorScopedMixin
+from core.utils import money
 from orders.api import OrderSummarySerializer
 
 from .services import admin_dashboard_data, vendor_dashboard_data
@@ -26,7 +27,7 @@ def _days(request):
 def plain(value):
     """Recursively convert Decimals to strings so money keeps its exact value in JSON."""
     if isinstance(value, Decimal):
-        return f"{value:.2f}"
+        return str(money(value))
     if isinstance(value, dict):
         return {key: plain(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
@@ -56,7 +57,7 @@ class AdminDashboardView(APIView):
                     for v in data["pending_vendor_list"]
                 ],
                 "low_stock_products": [
-                    {"id": p.pk, "name": p.name, "slug": p.slug, "stock": p.stock,
+                    {"id": p.pk, "name": p.name, "slug": p.slug, "stock": p.available_stock,
                      "vendor": p.vendor.business_name if p.vendor else None}
                     for p in data["low_stock_products"]
                 ],

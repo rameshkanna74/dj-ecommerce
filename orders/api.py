@@ -1,6 +1,6 @@
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_field
 from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -63,6 +63,12 @@ class CheckoutPreviewSerializer(serializers.Serializer):
         return obj.coupon.code if obj.coupon else None
 
 
+class OrderVendorSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    business_name = serializers.CharField()
+    store_slug = serializers.CharField()
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     vendor = serializers.SerializerMethodField()
     product_slug = serializers.CharField(source="product.slug", read_only=True)
@@ -74,7 +80,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = ["id", "product", "product_slug", "product_name", "variant", "variant_label", "vendor", "quantity",
                   "price", "subtotal", "status", "status_display", "tracking_number", "updated_at"]
 
-    def get_vendor(self, obj) -> dict | None:
+    @extend_schema_field(OrderVendorSerializer(allow_null=True))
+    def get_vendor(self, obj):
         if not obj.vendor_id:
             return None
         return {"id": obj.vendor_id, "business_name": obj.vendor.business_name, "store_slug": obj.vendor.store_slug}
@@ -253,7 +260,7 @@ class OrderCancelView(APIView):
         if not order.can_customer_cancel():
             return Response({"detail": "This order can no longer be cancelled.", "code": "not_cancellable"},
                             status=status.HTTP_409_CONFLICT)
-        services.cancel_order(order, request.user, serializer.validated_data["reason"])
+        services.cancel_order(order, request.user, serializer.validated_data["reason"], by_customer=True)
         return Response(OrderDetailSerializer(order_detail_queryset().get(pk=order.pk)).data)
 
 
@@ -290,7 +297,8 @@ class VendorOrderSerializer(serializers.ModelSerializer):
         fields = ["order_number", "status", "payment_status", "payment_method", "created_at", "customer_note",
                   "shipping_address", "items", "timeline"]
 
-    def get_items(self, obj) -> list[dict]:
+    @extend_schema_field(VendorOrderItemSerializer(many=True))
+    def get_items(self, obj):
         items = obj.items.filter(vendor=self.context["vendor"]).select_related("product", "order")
         return VendorOrderItemSerializer(items, many=True).data
 

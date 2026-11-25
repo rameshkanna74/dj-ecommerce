@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import Avg, Count, Exists, OuterRef, Q, Sum, Value
+from django.db.models import Avg, Count, Exists, F, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.urls import reverse
 
@@ -55,6 +55,18 @@ class ProductQuerySet(models.QuerySet):
             is_active=True,
             category__is_active=True,
         )
+
+    def with_available_stock(self):
+        """Annotate ``available_stock``: the sum of active variant stock for products with
+        options, otherwise ``Product.stock`` (which is unused once a product has variants)."""
+        variant_stock = (
+            ProductVariant.objects.filter(product=OuterRef("pk"), is_active=True)
+            .order_by()
+            .values("product")
+            .annotate(total=Sum("stock"))
+            .values("total")
+        )
+        return self.annotate(available_stock=Coalesce(Subquery(variant_stock), F("stock")))
 
     def in_stock(self):
         active_variant_in_stock = ProductVariant.objects.filter(product=OuterRef("pk"), is_active=True, stock__gt=0)

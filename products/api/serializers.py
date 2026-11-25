@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from accounts.models import VendorProfile
@@ -84,7 +85,8 @@ class ProductDetailSerializer(ProductListSerializer):
             "updated_at",
         ]
 
-    def get_variants(self, obj) -> list[dict]:
+    @extend_schema_field(VariantSerializer(many=True))
+    def get_variants(self, obj):
         return VariantSerializer(obj.active_variants, many=True).data
 
     def get_rating_breakdown(self, obj) -> dict[str, int]:

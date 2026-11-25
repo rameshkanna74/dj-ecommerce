@@ -189,7 +189,7 @@ def cancel_order(request, order_number):
         messages.error(request, "This order can no longer be cancelled. Please contact support.")
         return redirect(order.get_absolute_url())
     try:
-        services.cancel_order(order, request.user, form.cleaned_data["reason"])
+        services.cancel_order(order, request.user, form.cleaned_data["reason"], by_customer=True)
     except services.OrderWorkflowError as exc:
         messages.error(request, str(exc))
     else:

@@ -1,8 +1,9 @@
 # CoreCart — project guide for Claude
 
-Multi-vendor e-commerce backend. **Django 6.1 + Django REST Framework API at `/api/v1/`** (JWT + session auth).
-A React frontend will be built separately later by the user. Server-rendered Django templates also exist and work,
-but **do not build or redesign UI unless asked** — backend work goes into the DRF API.
+Multi-vendor e-commerce. **Django 6.1 + Django REST Framework API at `/api/v1/`** (JWT + session auth), and a
+**React SPA in `frontend/`** (Vite 8, React 19, TS 7, Tailwind v4, shadcn/ui, React Router 8, TanStack Query,
+Bun — see `frontend/README.md`). Server-rendered Django templates also exist and work (legacy); new UI goes in
+the React app, backend work goes into the DRF API.
 
 `prompt.md` is the original spec. It is partly outdated: it says to remove DRF, but DRF is now required for
 all backend APIs. The README is current and documents business rules, API usage and deployment.
@@ -21,6 +22,10 @@ uv sync                                   # deps (+ dev: pytest)
 - Tests use `config/test_settings.py`, which ignores `.env` (`DJANGO_SKIP_DOTENV`).
 - Production deps: `uv sync --extra production` (gunicorn, psycopg, redis, django-storages).
 
+Frontend (`cd frontend`): `bun run dev` (proxies /api to :8000), `bun run build` (tsc + vite — must pass),
+`bun run lint`, `bun run gen:api` (regenerate `src/api/schema.d.ts` after ANY API/serializer change).
+This machine is WSL/Linux: use `uv run pytest` / `uv run python manage.py ...` instead of the Windows paths above.
+
 ## Layout (where things live)
 | Path | Contents |
 |---|---|
@@ -31,6 +36,7 @@ uv sync                                   # deps (+ dev: pytest)
 | `<app>/services.py` | **Business logic.** `cart/services.py`, `orders/services.py` (checkout, status workflow, cancel), `orders/payments.py` (payment boundary), `products/services.py` (filtering, stock alerts), `support/services.py`, `analytics/services.py` (dashboard aggregation) |
 | `<app>/api.py` or `<app>/api/` | DRF serializers + views (accounts, products, cart, orders, analytics, support) |
 | `<app>/views.py`, `templates/` | Server-rendered site (legacy UI, keep working) |
+| `deploy/aws/` | AWS deploy: `deploy.py` (boto3: EC2 + CloudFront + S3 + SSM, `up/deploy/seed/domain/stop/destroy`), `remote.sh` (runs on the instance), nginx/systemd files. See README "Deploying to AWS" |
 | `tests/` | pytest suite; fixtures in `tests/conftest.py` (`customer`, `vendor`, `pending_vendor`, `admin_user`, `product`, `variant_product`, `make_product`, `make_coupon`, `fill_cart`, `shipping`, `api(user)`) |
 
 ## Rules to follow
@@ -59,6 +65,10 @@ uv sync                                   # deps (+ dev: pytest)
   - Use `@extend_schema` where the schema can't be inferred.
   - Guard user-dependent `get_queryset` with `is_schema_generation(self)` so the schema stays warning-free.
   - Add a test for every new endpoint.
+- `SerializerMethodField`s must be typed with `@extend_schema_field(...)` so the generated TS types are exact.
+- Frontend: one folder per area in `frontend/src/features/` (api.ts hooks + lazy `*-page.tsx`); reuse
+  `components/common` (Field, states, PageHeader, StatusBadge, Pager, charts). Never store tokens in
+  localStorage; the access token stays in memory (`src/api/client.ts`).
 - Browser auth: login with `use_cookie: true` puts the refresh token in an httpOnly cookie
   (`accounts/api/cookies.py`). Cookie refresh and logout require the `X-Requested-With` header.
 

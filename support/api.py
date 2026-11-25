@@ -1,5 +1,5 @@
 from django.db.models import Count, Q
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_field
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -58,13 +58,21 @@ class TicketDetailSerializer(TicketSerializer):
         fields = TicketSerializer.Meta.fields + ["messages"]
 
 
+class TicketUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    role = serializers.CharField()
+
+
 class StaffTicketSerializer(TicketDetailSerializer):
     user = serializers.SerializerMethodField()
 
     class Meta(TicketDetailSerializer.Meta):
         fields = TicketDetailSerializer.Meta.fields + ["user"]
 
-    def get_user(self, obj) -> dict:
+    @extend_schema_field(TicketUserSerializer)
+    def get_user(self, obj):
         return {"id": obj.user_id, "username": obj.user.username, "email": obj.user.email, "role": obj.user.role}
 
 

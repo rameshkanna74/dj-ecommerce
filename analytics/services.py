@@ -21,15 +21,26 @@ from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
 from accounts.models import VendorProfile
+from core.utils import money
 from orders.models import Order, OrderItem
 from products.models import Category, Product, Review
 
 ZERO = Value(Decimal("0.00"), output_field=DecimalField(max_digits=14, decimal_places=2))
 LINE_TOTAL = ExpressionWrapper(F("price") * F("quantity"), output_field=DecimalField(max_digits=14, decimal_places=2))
-LINE_NET = ExpressionWrapper(
-    F("price") * F("quantity") * (Value(Decimal("100")) - F("commission_rate")) / Value(Decimal("100")),
-    output_field=DecimalField(max_digits=14, decimal_places=2),
-)
+
+
+def _net_earnings(lines):
+    """
+    Vendor net for ``lines``: each line total minus its commission rounded to the cent
+    (exactly what ``OrderItem.vendor_earnings`` shows per line). Lines are grouped by
+    (price, quantity, rate) in SQL so this stays one small query, and the rounding is done
+    with Decimal in Python because SQLite's ROUND works on floats.
+    """
+    total = Decimal("0.00")
+    for row in lines.values("price", "quantity", "commission_rate").annotate(n=Count("id")).order_by():
+        line_total = row["price"] * row["quantity"]
+        total += (line_total - money(line_total * row["commission_rate"] / Decimal("100"))) * row["n"]
+    return money(total)
 
 
 def _recognised_orders():
@@ -60,10 +71,10 @@ def admin_dashboard_data(days=30):
         vendors=Count("id", filter=Q(role=User.Role.VENDOR)),
     )
     vendors = VendorProfile.objects.aggregate(pending=Count("id", filter=Q(approval_status="pending")))
-    products = Product.objects.aggregate(
+    products = Product.objects.with_available_stock().aggregate(
         total=Count("id"),
         active=Count("id", filter=Q(is_active=True)),
-        out_of_stock=Count("id", filter=Q(is_active=True, stock=0)),
+        out_of_stock=Count("id", filter=Q(is_active=True, available_stock__lte=0)),
     )
     orders = Order.objects.aggregate(
         total=Count("id"),
@@ -122,9 +133,10 @@ def admin_dashboard_data(days=30):
         ],
         "sales_trend": _fill_days(trend_rows, days, "total"),
         "pending_vendor_list": VendorProfile.objects.filter(approval_status="pending").select_related("user")[:5],
-        "low_stock_products": Product.objects.filter(is_active=True, stock__lte=5)
+        "low_stock_products": Product.objects.with_available_stock()
+        .filter(is_active=True, available_stock__lte=5)
         .select_related("vendor")
-        .order_by("stock")[:6],
+        .order_by("available_stock", "pk")[:6],
         "category_count": Category.objects.count(),
         "days": days,
     }
@@ -136,10 +148,10 @@ def vendor_dashboard_data(vendor, days=30):
     own_lines = OrderItem.objects.filter(vendor=vendor)
     live = _live_lines().filter(vendor=vendor)
 
-    product_stats = own_products.aggregate(
+    product_stats = own_products.with_available_stock().aggregate(
         total=Count("id"),
         active=Count("id", filter=Q(is_active=True)),
-        out_of_stock=Count("id", filter=Q(is_active=True, stock=0)),
+        out_of_stock=Count("id", filter=Q(is_active=True, available_stock__lte=0)),
     )
     order_stats = own_lines.aggregate(
         orders=Count("order", distinct=True),
@@ -147,9 +159,9 @@ def vendor_dashboard_data(vendor, days=30):
         to_ship=Count("id", filter=Q(status__in=[OrderItem.Status.PENDING, OrderItem.Status.PROCESSING])),
     )
     sales = live.aggregate(units=Coalesce(Sum("quantity"), 0), gross=Coalesce(Sum(LINE_TOTAL), ZERO))
-    earnings = live.filter(order__payment_status=Order.PaymentStatus.PAID).aggregate(
-        recognised=Coalesce(Sum(LINE_TOTAL), ZERO), net=Coalesce(Sum(LINE_NET), ZERO)
-    )
+    paid_lines = live.filter(order__payment_status=Order.PaymentStatus.PAID)
+    earnings = paid_lines.aggregate(recognised=Coalesce(Sum(LINE_TOTAL), ZERO))
+    earnings["net"] = _net_earnings(paid_lines)
     rating = Review.objects.filter(product__vendor=vendor, is_visible=True).aggregate(
         avg=Avg("rating"), count=Count("id")
     )

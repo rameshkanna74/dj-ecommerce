@@ -1,10 +1,17 @@
+import contextlib
+
 from django.contrib.auth import password_validation
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.utils import get_md5_hash_password
 
 from accounts.forms import CustomerRegistrationForm, VendorRegistrationForm
 from accounts.models import CustomerProfile, CustomUser, VendorProfile
@@ -43,11 +50,15 @@ class UserSerializer(serializers.ModelSerializer):
     customer_profile = CustomerProfileSerializer(required=False)
     vendor = VendorSummarySerializer(source="vendor_profile", read_only=True)
     is_platform_admin = serializers.BooleanField(read_only=True)
+    current_password = serializers.CharField(
+        write_only=True, required=False, help_text="Required when changing ``email``.",
+        style={"input_type": "password"},
+    )
 
     class Meta:
         model = CustomUser
         fields = ["id", "username", "email", "first_name", "last_name", "phone", "avatar", "role",
-                  "is_platform_admin", "date_joined", "customer_profile", "vendor"]
+                  "is_platform_admin", "date_joined", "customer_profile", "vendor", "current_password"]
         read_only_fields = ["id", "username", "role", "date_joined"]
 
     def to_representation(self, instance):
@@ -63,6 +74,18 @@ class UserSerializer(serializers.ModelSerializer):
         if CustomUser.objects.filter(email__iexact=value).exclude(pk=self.instance.pk).exists():
             raise serializers.ValidationError("This email is already in use.")
         return value
+
+    def validate(self, attrs):
+        password = attrs.pop("current_password", None)
+        new_email = attrs.get("email")
+        if self.instance is not None and new_email is not None and new_email != self.instance.email.lower():
+            # The email address controls password resets, so changing it needs the password:
+            # a stolen access token alone must not allow a permanent account takeover.
+            if not password or not self.instance.check_password(password):
+                raise serializers.ValidationError(
+                    {"current_password": ["Enter your current password to change your email address."]}
+                )
+        return attrs
 
     def update(self, instance, validated_data):
         profile_data = validated_data.pop("customer_profile", None)
@@ -142,6 +165,26 @@ class TokenWithUserSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         data["user"] = UserSerializer(self.user, context=self.context).data
         return data
+
+
+class RevocableTokenRefreshSerializer(TokenRefreshSerializer):
+    """
+    SimpleJWT's refresh serializer, plus: a deleted user gives 401 (not 500), and a refresh
+    token issued before the user's last password change is rejected and blacklisted.
+    """
+
+    def validate(self, attrs):
+        refresh = RefreshToken(attrs["refresh"])
+        user = CustomUser.objects.filter(
+            **{jwt_settings.USER_ID_FIELD: refresh.payload.get(jwt_settings.USER_ID_CLAIM)}
+        ).first()
+        if user is None:
+            raise AuthenticationFailed("No active account found for the given token.", "no_active_account")
+        if refresh.payload.get(jwt_settings.REVOKE_TOKEN_CLAIM) != get_md5_hash_password(user.password):
+            with contextlib.suppress(AttributeError, TokenError):
+                refresh.blacklist()
+            raise AuthenticationFailed("The user's password has been changed.", "password_changed")
+        return super().validate(attrs)
 
 
 class PasswordChangeSerializer(serializers.Serializer):

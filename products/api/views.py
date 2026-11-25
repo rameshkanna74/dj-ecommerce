@@ -1,3 +1,4 @@
+from django.db import IntegrityError, transaction
 from django.db.models import Count, ProtectedError, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -100,13 +101,18 @@ class ProductViewSet(PublicCacheMixin, viewsets.ReadOnlyModelViewSet):
             page = self.paginate_queryset(product.reviews.filter(is_visible=True).select_related("user"))
             return self.get_paginated_response(ReviewSerializer(page, many=True).data)
         self._require_customer(request)
+        duplicate = Response({"detail": "You have already reviewed this product.", "code": "duplicate_review"},
+                             status=status.HTTP_409_CONFLICT)
         if Review.objects.filter(product=product, user=request.user).exists():
-            return Response({"detail": "You have already reviewed this product.", "code": "duplicate_review"},
-                            status=status.HTTP_409_CONFLICT)
+            return duplicate
         serializer = ReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(product=product, user=request.user,
-                        is_verified_purchase=user_has_purchased(request.user, product))
+        try:
+            with transaction.atomic():
+                serializer.save(product=product, user=request.user,
+                                is_verified_purchase=user_has_purchased(request.user, product))
+        except IntegrityError:  # a concurrent identical POST won the unique (product, user) race
+            return duplicate
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     # ---- questions -----------------------------------------------------
@@ -246,7 +252,12 @@ class VendorVariantViewSet(_VendorProductChildViewSet):
     serializer_class = VariantSerializer
 
     def get_queryset(self):
-        return ProductVariant.objects.filter(product=self.get_product())
+        return ProductVariant.objects.filter(product=self.get_product()).select_related("product")
+
+    def perform_destroy(self, instance):
+        if instance.order_items.exists():
+            raise ProtectedError("Variant has order lines.", {instance})  # -> 409; set is_active=false instead
+        instance.delete()
 
 
 class VendorProductImageViewSet(_VendorProductChildViewSet):

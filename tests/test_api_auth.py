@@ -128,10 +128,54 @@ class TestMeAndPasswords:
         client = api(customer)
         assert client.post(reverse("api:password-change"), {"old_password": "nope", "new_password": NEW_PASSWORD},
                            format="json").status_code == 400
-        assert client.post(reverse("api:password-change"), {"old_password": PASSWORD, "new_password": NEW_PASSWORD},
-                           format="json").status_code == 204
+        response = client.post(reverse("api:password-change"),
+                               {"old_password": PASSWORD, "new_password": NEW_PASSWORD}, format="json")
+        assert response.status_code == 200
+        assert bearer(response.json()["access"]).get(reverse("api:me")).status_code == 200
         customer.refresh_from_db()
         assert customer.check_password(NEW_PASSWORD)
+
+
+def login_tokens(username, password):
+    response = APIClient().post(reverse("api:token"), {"username": username, "password": password}, format="json")
+    assert response.status_code == 200, response.content
+    return response.json()
+
+
+class TestTokenRevocation:
+    def test_password_change_revokes_tokens_on_other_devices(self, customer):
+        stolen = login_tokens("alice", PASSWORD)
+        mine = login_tokens("alice", PASSWORD)
+        assert bearer(mine["access"]).post(reverse("api:password-change"),
+                                           {"old_password": PASSWORD, "new_password": NEW_PASSWORD},
+                                           format="json").status_code == 200
+        assert bearer(stolen["access"]).get(reverse("api:me")).status_code == 401
+        refreshed = APIClient().post(reverse("api:token-refresh"), {"refresh": stolen["refresh"]}, format="json")
+        assert refreshed.status_code == 401
+
+    def test_password_reset_revokes_existing_refresh_tokens(self, customer):
+        tokens = login_tokens("alice", PASSWORD)
+        customer.set_password(NEW_PASSWORD)  # same effect as the reset-confirm flow
+        customer.save()
+        assert APIClient().post(reverse("api:token-refresh"), {"refresh": tokens["refresh"]},
+                                format="json").status_code == 401
+        fresh = login_tokens("alice", NEW_PASSWORD)
+        assert APIClient().post(reverse("api:token-refresh"), {"refresh": fresh["refresh"]},
+                                format="json").status_code == 200
+
+    def test_refresh_for_deleted_user_is_401_not_500(self, customer):
+        tokens = login_tokens("alice", PASSWORD)
+        customer.delete()
+        assert APIClient().post(reverse("api:token-refresh"), {"refresh": tokens["refresh"]},
+                                format="json").status_code == 401
+
+    def test_forwarded_for_header_does_not_bypass_login_throttle(self, customer):
+        codes = set()
+        for i in range(30):
+            client = APIClient(REMOTE_ADDR="203.0.113.7", HTTP_X_FORWARDED_FOR=f"10.0.0.{i}")
+            codes.add(client.post(reverse("api:token"), {"username": "alice", "password": "wrong"},
+                                  format="json").status_code)
+        assert 429 in codes
 
     def test_password_reset_flow(self, customer, mailoutbox, settings):
         settings.CORECART_FRONTEND_URL = "https://app.example.com"

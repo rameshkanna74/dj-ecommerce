@@ -1,0 +1,9 @@
+# Keep LF in the repo regardless of the editor/OS (the project is edited on Windows and Linux).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.sqlite3 binary

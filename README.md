@@ -73,6 +73,15 @@ curl -s -X POST localhost:8000/api/v1/checkout/ -H "Authorization: Bearer $TOKEN
    `credentials: "include"` and the header `X-Requested-With: XMLHttpRequest`. The cookie is rotated
    automatically. The header is required for cookie-based refresh and logout as CSRF protection.
 4. Log out with `POST /api/v1/auth/logout/` (same header). This blacklists the token and clears the cookie.
+
+Token security notes:
+
+- Tokens embed a hash of the password. Changing or resetting the password (API, site or Django admin)
+  invalidates **every** existing access and refresh token on all devices. `POST /api/v1/auth/password/change/`
+  therefore returns a fresh `{"access", "refresh"}` pair (200). With the cookie flow, the new refresh token is set
+  in the cookie.
+- Changing `email` through `PATCH /api/v1/me/` requires `current_password` in the same request.
+- Deactivated or deleted users get 401 on refresh.
 5. Set `CORECART_FRONTEND_URL` so password-reset emails link to `<frontend>/reset-password?uid=..&token=..`. The
    page then posts to `/api/v1/auth/password/reset/confirm/`.
 
@@ -178,8 +187,13 @@ Open http://localhost:8000. The admin dashboard is at `/staff/dashboard/` and th
 ## Running tests
 
 ```bash
-uv run pytest            # full suite
+uv run pytest            # full suite (SQLite)
 uv run pytest -q tests/test_checkout.py
+
+# Same suite on PostgreSQL, including the threaded race-condition tests in tests/test_concurrency.py
+# (oversell, coupon limits, double submit, deadlocks). The role needs CREATEDB; a test_<DB_NAME> database is
+# created and dropped.
+CORECART_TEST_DB=postgresql DB_USER=corecart DB_PASSWORD=... DB_HOST=localhost uv run pytest
 ```
 
 The suite uses `config/test_settings.py` (DEBUG off, fast password hashing, in-memory email, temporary media).
@@ -228,7 +242,9 @@ conditional updates, so overselling is impossible.
 2. `DJANGO_DEBUG=False`, a unique `DJANGO_SECRET_KEY`, correct `DJANGO_ALLOWED_HOSTS`, and a non-default
    `DJANGO_ADMIN_URL`.
 3. HTTPS in front of the app. Secure cookies, SSL redirect and HSTS are on by default when DEBUG is off.
-   Set `DJANGO_BEHIND_PROXY=True` if a proxy terminates TLS.
+   Set `DJANGO_BEHIND_PROXY=True` if a proxy terminates TLS. Rate limits identify clients by `REMOTE_ADDR` unless
+   `DJANGO_NUM_PROXIES` (default 1 when behind a proxy, else 0) says how many trusted proxies add
+   `X-Forwarded-For`. Set it to the real hop count, or clients can spoof their IP to dodge login throttling.
 4. PostgreSQL (`DB_ENGINE=postgresql`, `DB_*`), then `python manage.py migrate`.
 5. Redis (`REDIS_URL`), so rate limits are shared by all workers.
 6. Media: `MEDIA_STORAGE=s3` with a bucket (optionally behind a CDN via `S3_CUSTOM_DOMAIN`), or local disk served
@@ -244,6 +260,99 @@ conditional updates, so overselling is impossible.
 11. Run `gunicorn config.wsgi` (settings in `gunicorn.conf.py`; `GUNICORN_WORKERS`, `GUNICORN_BIND`).
 12. Point your load balancer's health check at `GET /api/v1/health/`. It verifies the database and cache and
     returns the version.
+
+## Deploying to AWS (low-cost demo)
+
+`deploy/aws/deploy.py` (Python + boto3) builds and deploys the whole stack, the API and the React app, to one
+AWS region (default `us-east-1`). Running it again is safe: it creates what is missing and updates the rest.
+
+```
+Browser ──HTTPS──► CloudFront  (free TLS + https://dxxxx.cloudfront.net, caching, security headers)
+                      │  HTTP, accepted only from CloudFront IPs (security group) carrying a secret header (nginx)
+                      ▼
+            EC2 t4g.micro · Amazon Linux 2023 arm64 · encrypted gp3 · IMDSv2 · no SSH, no key pair
+              nginx ─ React build (frontend/dist), /static, /media; proxies /api/* and the admin
+              gunicorn (systemd, sandboxed, unprivileged user) → PostgreSQL (unix socket) + Redis (loopback)
+            S3 (private, encrypted, TLS-only): release bundles, nightly DB + media backups
+            SSM Parameter Store (SecureString): Django env and secrets · shell via SSM Session Manager
+```
+
+**Cost:** about **$11/month** in `us-east-1`: t4g.micro ~$6.1, public IPv4 $3.65, 16 GB gp3 $1.28, plus
+S3 and CloudFront, which normally stay inside the free tier. `deploy.py stop` stops the server between demos,
+leaving about $5/month. There is no load balancer, NAT gateway, RDS, ElastiCache or WAF; together those would
+cost $80+/month.
+
+**Security:** HTTPS only (HTTP redirects to HTTPS), HSTS, and the server is reachable only through CloudFront. No
+inbound SSH: use `aws ssm start-session`. The instance role has least privilege: it can read only `/corecart/*`
+parameters and its own S3 prefixes, and holds no access keys. Secrets live in SSM, never in git or the bundle. The
+admin lives at a random URL (`DJANGO_ADMIN_URL`). PostgreSQL and Redis listen only locally. Security updates are
+applied nightly. When a release fails its health check, the server rolls back automatically.
+
+### Prerequisites
+- An IAM **access key**. A console password does not work with boto3. Store it in `~/.aws/credentials`, never
+  in the repo:
+  ```ini
+  [corecart]
+  aws_access_key_id = AKIA...
+  aws_secret_access_key = ...
+  ```
+  The user needs rights for EC2, IAM (role + instance profile), S3, SSM, CloudFront and ACM.
+- `uv` and `bun` installed locally. The script builds the frontend and bundles the working tree (gitignored
+  files such as `.env`, `db.sqlite3`, `media/` and `aws.md` are never uploaded).
+- Optional: the AWS CLI + Session Manager plugin, for shell access.
+
+### Deploy
+```bash
+export AWS_PROFILE=corecart
+uv run deploy/aws/deploy.py up        # first deploy: ~10-15 min (CloudFront propagation is most of it)
+uv run deploy/aws/deploy.py seed      # demo vendor/customer/products + an `admin` superuser
+uv run deploy/aws/deploy.py status    # URLs, admin path, instance id
+```
+Passwords created by `seed` are stored in SSM, not printed:
+```bash
+aws ssm get-parameter --with-decryption --name /corecart/admin-password --query Parameter.Value --output text
+aws ssm get-parameter --with-decryption --name /corecart/demo-password  --query Parameter.Value --output text
+```
+
+### Day-to-day
+| Task | Command |
+|---|---|
+| Ship new code (builds the frontend, migrates, restarts, health-checks) | `uv run deploy/aws/deploy.py deploy` |
+| Re-apply config after editing the `/corecart/env` parameter (e.g. SMTP settings) | `uv run deploy/aws/deploy.py config` |
+| Shell on the server | `aws ssm start-session --target <instance-id>` then `sudo corecart-manage shell` |
+| App logs | `sudo journalctl -u corecart -f` (nginx: `/var/log/nginx/`) |
+| Backup now | `sudo systemctl start corecart-backup` (nightly at 03:15 UTC → `s3://corecart-<account>-<region>/backups/`) |
+| Restore a DB dump | `aws s3 cp s3://…/backups/db/<file>.dump /tmp/` then `sudo -u postgres pg_restore -c -d corecart /tmp/<file>.dump` |
+| Pause / resume billing for compute | `uv run deploy/aws/deploy.py stop` / `start` |
+| Bigger server | `stop`, change the instance type in the EC2 console (e.g. `t4g.small`), `start` |
+| Delete everything | `uv run deploy/aws/deploy.py destroy --yes` (add `--delete-bucket` to drop backups too) |
+
+Email uses the console backend (messages go to the app log). To send real mail, add SMTP settings such as
+`EMAIL_BACKEND`, `EMAIL_HOST` and `EMAIL_HOST_USER` (Amazon SES SMTP works) to the `/corecart/env` parameter,
+then run `deploy.py config`.
+
+### Using your own domain
+The demo runs on `https://dxxxx.cloudfront.net`. To move it to your own domain (e.g. `shop.example.com`):
+
+1. Request the certificate. This prints the DNS validation record(s):
+   ```bash
+   uv run deploy/aws/deploy.py domain shop.example.com            # several names: add www.shop.example.com
+   ```
+2. At your DNS provider, add the printed **CNAME** validation record and wait until ACM shows the certificate
+   as issued (usually 5–30 minutes).
+3. Run the same command again. It attaches the domain and certificate (TLS 1.2+) to CloudFront, then adds the
+   domain to `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS` and `CORS_ALLOWED_ORIGINS`, sets
+   `CORECART_BASE_URL`/`CORECART_FRONTEND_URL` (used in email links), and restarts the app.
+4. Point the domain at CloudFront:
+   - Sub-domain (`shop.example.com`): add a `CNAME` record pointing to `dxxxx.cloudfront.net`.
+   - Root domain (`example.com`): add a Route 53 **alias A/AAAA** record (a hosted zone costs $0.50/month),
+     or use your DNS provider's `ALIAS`/`ANAME`/CNAME-flattening.
+
+The `cloudfront.net` address keeps working. Because the SPA and the API share one origin, cookies stay
+`SameSite=Lax` and no CORS setup is needed. To switch domains later, run `domain` with the new name(s). To go
+back to only the CloudFront URL, remove the alternate domain names and the custom certificate from the
+distribution in the CloudFront console, then run `deploy.py config`. The allowed hosts are always rebuilt from the
+distribution's current names.
 
 ## Business rules and design decisions
 

@@ -1,0 +1,6 @@
+[Unit]
+Description=CoreCart database + media backup to S3
+After=postgresql.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/corecart-backup

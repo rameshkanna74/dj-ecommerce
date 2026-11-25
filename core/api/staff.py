@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -96,6 +97,8 @@ class StaffProductSerializer(serializers.ModelSerializer):
 
 
 class StaffReviewSerializer(VendorReviewSerializer):
+    rating = serializers.IntegerField(read_only=True)  # moderation may hide a review, never rewrite it
+
     class Meta(VendorReviewSerializer.Meta):
         read_only_fields = [f for f in VendorReviewSerializer.Meta.fields if f != "is_visible"]
 
@@ -253,8 +256,11 @@ class StaffUserViewSet(StaffMixin, mixins.ListModelMixin, mixins.RetrieveModelMi
         return queryset
 
     def perform_update(self, serializer):
-        if serializer.instance.pk == self.request.user.pk:
+        target = serializer.instance
+        if target.pk == self.request.user.pk:
             raise serializers.ValidationError({"is_active": "You cannot change your own account status."})
+        if (target.is_superuser or target.is_platform_admin) and not self.request.user.is_superuser:
+            raise PermissionDenied("Only a superuser can change the status of an administrator account.")
         serializer.save()
 
 
@@ -272,7 +278,10 @@ class StaffProductViewSet(StaffMixin, mixins.ListModelMixin, mixins.RetrieveMode
     def get_queryset(self):
         queryset = Product.objects.select_related("vendor", "category").order_by("-created_at")
         if self.request.query_params.get("low_stock") in {"1", "true"}:
-            queryset = queryset.filter(is_active=True, stock__lte=5).order_by("stock")
+            queryset = (
+                queryset.with_available_stock().filter(is_active=True, available_stock__lte=5)
+                .order_by("available_stock", "pk")
+            )
         query = self.request.query_params.get("q", "").strip()
         if query:
             queryset = queryset.filter(name__icontains=query)

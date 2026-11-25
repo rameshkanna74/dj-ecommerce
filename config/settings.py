@@ -335,6 +335,10 @@ REST_FRAMEWORK = {
         "auth": env("API_THROTTLE_AUTH", "20/min"),
     },
     "EXCEPTION_HANDLER": "core.api.exceptions.api_exception_handler",
+    # Number of trusted reverse proxies in front of the app. Throttling identifies clients by
+    # REMOTE_ADDR when 0; otherwise by the matching X-Forwarded-For hop. Never trust a raw
+    # client-supplied X-Forwarded-For (that lets anyone bypass the login rate limit).
+    "NUM_PROXIES": int(env("DJANGO_NUM_PROXIES", "1" if env_bool("DJANGO_BEHIND_PROXY", False) else "0")),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
@@ -373,6 +377,10 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
+    # Tokens carry a hash of the password: changing or resetting the password (API, site,
+    # admin) invalidates every access and refresh token issued before the change.
+    "CHECK_REVOKE_TOKEN": True,
+    "TOKEN_REFRESH_SERIALIZER": "accounts.api.serializers.RevocableTokenRefreshSerializer",
 }
 
 SPECTACULAR_SETTINGS = {

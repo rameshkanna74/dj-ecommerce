@@ -65,8 +65,19 @@ class ProductVariantForm(forms.ModelForm):
         }
 
 
+class BaseProductVariantFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        for form in self.deleted_forms:
+            if form.instance.pk and form.instance.order_items.exists():
+                raise forms.ValidationError(
+                    f'"{form.instance.label}" has been ordered and cannot be deleted. Untick "active" to hide it.'
+                )
+
+
 ProductVariantFormSet = inlineformset_factory(
-    Product, ProductVariant, form=ProductVariantForm, extra=1, can_delete=True, max_num=20, validate_max=True
+    Product, ProductVariant, form=ProductVariantForm, formset=BaseProductVariantFormSet, extra=1, can_delete=True,
+    max_num=20, validate_max=True,
 )
 
 ProductImageFormSet = inlineformset_factory(

@@ -239,8 +239,10 @@ class OrderItem(models.Model):
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="order_items")
+    # PROTECT: a sold option must stay linked so cancellations restock the right variant.
+    # Vendors deactivate options that have orders instead of deleting them.
     variant = models.ForeignKey(
-        ProductVariant, on_delete=models.SET_NULL, null=True, blank=True, related_name="order_items"
+        ProductVariant, on_delete=models.PROTECT, null=True, blank=True, related_name="order_items"
     )
     vendor = models.ForeignKey(
         "accounts.VendorProfile",

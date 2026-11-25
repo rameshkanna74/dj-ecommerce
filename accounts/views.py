@@ -9,6 +9,7 @@ from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 
 from cart.services import CartError, add_to_cart
+from core.ratelimit import client_ip, is_limited, register_hit
 from core.utils import safe_redirect_target
 from orders.models import Order
 from products.models import Product
@@ -68,10 +69,27 @@ def vendor_register(request):
     )
 
 
+LOGIN_FAILURE_LIMIT = 20  # failed attempts per client IP ...
+LOGIN_FAILURE_WINDOW = 15 * 60  # ... per 15 minutes
+
+
 class LoginView(auth_views.LoginView):
+    """Site login. Repeated failures from one IP are blocked for a while (HTTP 429)."""
+
     template_name = "accounts/login.html"
     authentication_form = LoginForm
     redirect_authenticated_user = True
+
+    def post(self, request, *args, **kwargs):
+        if is_limited("login", client_ip(request), LOGIN_FAILURE_LIMIT):
+            # Do not even check the password; show an empty form with the error.
+            messages.error(request, "Too many failed sign-in attempts. Please wait a few minutes and try again.")
+            return self.render_to_response(self.get_context_data(form=self.get_form_class()(request)), status=429)
+        return super().post(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        register_hit("login", client_ip(self.request), LOGIN_FAILURE_WINDOW)
+        return super().form_invalid(form)
 
 
 class LogoutView(auth_views.LogoutView):

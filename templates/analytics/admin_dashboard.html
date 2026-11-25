@@ -78,7 +78,7 @@
       <section class="card">
         <div class="card-head"><h2>Stock monitoring</h2><span class="text-sm text-muted">5 units or fewer</span></div>
         {% for product in low_stock_products %}
-          <div class="split text-sm order-line"><span>{{ product.name }}<br><span class="text-muted">{{ product.vendor.business_name|default:"CoreCart" }}</span></span><span class="badge badge--{% if product.stock == 0 %}danger{% else %}warning{% endif %}">{{ product.stock }} left</span></div>
+          <div class="split text-sm order-line"><span>{{ product.name }}<br><span class="text-muted">{{ product.vendor.business_name|default:"CoreCart" }}</span></span><span class="badge badge--{% if product.available_stock <= 0 %}danger{% else %}warning{% endif %}">{{ product.available_stock }} left</span></div>
         {% empty %}<p class="text-muted mb-0">All active products are well stocked.</p>{% endfor %}
       </section>
     </div>

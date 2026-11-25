@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import update_session_auth_hash
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
@@ -132,14 +133,23 @@ class MeView(generics.RetrieveUpdateAPIView):
 
 
 class PasswordChangeView(APIView):
-    @extend_schema(request=PasswordChangeSerializer, responses={204: None})
+    """
+    Change the password. Every token issued before the change stops working (on all devices),
+    so a fresh ``access``/``refresh`` pair is returned. If the caller uses the refresh cookie,
+    the new refresh token is set in that cookie instead of the body.
+    """
+
+    @extend_schema(request=PasswordChangeSerializer, responses={200: TokenRefreshSerializer})
     def post(self, request):
         serializer = PasswordChangeSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
+        had_cookie = settings.JWT_REFRESH_COOKIE_NAME in request.COOKIES
         user = serializer.save()
         if request.session.session_key:
             update_session_auth_hash(request, user)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        refresh = RefreshToken.for_user(user)
+        response = Response({"access": str(refresh.access_token), "refresh": str(refresh)})
+        return move_refresh_to_cookie(response) if had_cookie else response
 
 
 class PasswordResetRequestView(APIView):

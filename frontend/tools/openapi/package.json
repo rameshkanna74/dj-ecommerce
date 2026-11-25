@@ -1,0 +1,9 @@
+{
+  "name": "corecart-openapi-codegen",
+  "private": true,
+  "description": "Isolated codegen toolchain: openapi-typescript needs the TypeScript 5 JS API (the app itself uses TypeScript 7).",
+  "devDependencies": {
+    "openapi-typescript": "^7.10.1",
+    "typescript": "~5.9.3"
+  }
+}
